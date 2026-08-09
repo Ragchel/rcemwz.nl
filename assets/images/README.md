@@ -1,12 +1,11 @@
-# Homepage images
+# Shared site images
 
-Place the homepage images in this directory using these filenames:
+Place images that do not belong to a specific project in this directory. The
+homepage currently expects:
 
 - `about.webp`
-- `project-1.webp`
-- `project-2.webp`
-- `project-3.webp`
 
-The homepage detects these files automatically. To use another filename or image
-format, change the corresponding `data-image` path in the root `index.html` file.
-Update its `data-alt` description at the same time.
+Project images live alongside their project pages under
+`projects/<project-name>/images/`. To use another filename or image format, change
+the corresponding `data-image` paths and update the `data-alt` description at the
+same time.
