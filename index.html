@@ -1,9 +1,106 @@
 <!doctype html>
-<html>
+<html lang="en">
     <head>
-        <title>rcemwz.nl</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="Rachel's personal corner for custom modpacks and hobby projects.">
+        <meta name="theme-color" content="#fffaf7">
+        <title>Home — rcemwz</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="script.js" defer></script>
     </head>
     <body>
-        <h1>This is a placeholder page</h1>
-        <p>This is a placeholder page before making this a website.</p>
+        <a class="skip-link" href="#main-content">Skip to the main content</a>
+
+        <header class="site-header">
+            <a class="site-logo" href="#home" aria-label="rcemwz, back to the top">
+                <span aria-hidden="true">✿</span>
+                rcemwz
+            </a>
+
+            <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+                <span class="visually-hidden">Open navigation</span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </button>
+
+            <nav id="site-navigation" class="site-navigation" aria-label="Main navigation">
+                <a href="#home" aria-current="page">Home</a>
+                <a href="#about">About</a>
+                <a href="projects/index.html">Projects</a>
+            </nav>
+        </header>
+
+        <main id="main-content">
+            <section id="home" class="hero" aria-labelledby="hero-title">
+                <div class="sakura-branch sakura-branch--top" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i><i></i>
+                </div>
+                <div class="sakura-branch sakura-branch--bottom" aria-hidden="true">
+                    <i></i><i></i><i></i>
+                </div>
+
+                <div class="hero-content">
+                    <p class="eyebrow">A little corner for things I make</p>
+                    <h1 id="hero-title">Hi, I’m Rachel.</h1>
+                    <p class="hero-intro">I make custom modpacks, tinker with ideas, and build things for friends to enjoy together.</p>
+                    <a class="text-link" href="projects/index.html">See what I’m working on <span aria-hidden="true">→</span></a>
+                </div>
+
+                <span class="petal petal--one" aria-hidden="true"></span>
+                <span class="petal petal--two" aria-hidden="true"></span>
+                <span class="petal petal--three" aria-hidden="true"></span>
+            </section>
+
+            <section id="about" class="about section" aria-labelledby="about-title">
+                <div class="about-copy">
+                    <p class="eyebrow">Behind the projects</p>
+                    <h2 id="about-title">About me</h2>
+                    <span class="blossom-rule" aria-hidden="true"><i></i></span>
+                    <p class="lead">Hi! I am Rachel and I do stuff with modpacks for games, primarily Minecraft.</p>
+                    <p>I make them to fit my own vision and needs, but I also create them for friends so we can play together on a semi-regular basis.</p>
+                </div>
+
+                <figure class="image-slot image-slot--large" data-image="assets/images/about.webp" data-alt="Rachel's chosen image for the about section">
+                    <!-- Add assets/images/about.webp, or change the data-image path above. -->
+                </figure>
+            </section>
+
+            <section id="projects" class="projects section" aria-labelledby="projects-title">
+                <div class="section-heading">
+                    <p class="eyebrow">Made in my spare time</p>
+                    <h2 id="projects-title">My projects</h2>
+                    <p>Experiments, modpacks, and other things I’ve enjoyed putting together.</p>
+                    <span class="blossom-rule blossom-rule--centered" aria-hidden="true"><i></i></span>
+                </div>
+
+                <div class="project-gallery" aria-label="Project image gallery">
+                    <a class="project-preview" href="projects/project-1/index.html" aria-label="Open project 01">
+                        <figure class="image-slot" data-image="assets/images/project-1.webp" data-alt="First project preview">
+                            <!-- Add assets/images/project-1.webp, or change the data-image path above. -->
+                        </figure>
+                        <span>Project 01 <i aria-hidden="true">→</i></span>
+                    </a>
+                    <a class="project-preview" href="projects/project-2/index.html" aria-label="Open project 02">
+                        <figure class="image-slot" data-image="assets/images/project-2.webp" data-alt="Second project preview">
+                            <!-- Add assets/images/project-2.webp, or change the data-image path above. -->
+                        </figure>
+                        <span>Project 02 <i aria-hidden="true">→</i></span>
+                    </a>
+                    <a class="project-preview" href="projects/project-3/index.html" aria-label="Open project 03">
+                        <figure class="image-slot" data-image="assets/images/project-3.webp" data-alt="Third project preview">
+                            <!-- Add assets/images/project-3.webp, or change the data-image path above. -->
+                        </figure>
+                        <span>Project 03 <i aria-hidden="true">→</i></span>
+                    </a>
+                </div>
+                <!-- Different filenames and formats work too: update data-image and data-alt above. -->
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <p>© 2026 rcemwz <span aria-hidden="true">·</span> Made with care and a few cherry blossoms.</p>
+            <a href="projects/index.html">View all projects <span aria-hidden="true">→</span></a>
+        </footer>
     </body>
+</html>
