@@ -211,6 +211,19 @@ h2 {
     font-size: clamp(2.5rem, 6vw, 4.5rem);
 }
 
+.heading-link {
+    color: inherit;
+    text-decoration-color: transparent;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.14em;
+    transition: color 180ms ease, text-decoration-color 180ms ease;
+}
+
+.heading-link:hover {
+    color: var(--pink-dark);
+    text-decoration-color: currentColor;
+}
+
 .hero-intro {
     max-width: 620px;
     margin: 1.8rem auto 2.25rem;
