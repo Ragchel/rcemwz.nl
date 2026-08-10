@@ -694,6 +694,452 @@ code {
     text-transform: uppercase;
 }
 
+/* Pokémon binder project */
+.binder-hero {
+    padding-bottom: clamp(5rem, 10vw, 8rem);
+    background:
+        radial-gradient(circle at 72% 30%, rgba(245, 215, 220, 0.9), transparent 25%),
+        radial-gradient(circle at 15% 78%, rgba(220, 229, 214, 0.72), transparent 22%),
+        linear-gradient(145deg, #fffdf9, var(--paper-deep));
+}
+
+.binder-hero h1 {
+    font-size: clamp(3.2rem, 9vw, 7.4rem);
+}
+
+.binder-hero .text-link {
+    margin-top: 0.25rem;
+}
+
+.binder-introduction,
+.binder-notes {
+    display: grid;
+    width: min(calc(100% - 3rem), 960px);
+    margin: 0 auto;
+    padding: clamp(4rem, 9vw, 8rem) 0;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(2rem, 8vw, 7rem);
+}
+
+.binder-introduction p {
+    margin: 0;
+    color: var(--muted);
+}
+
+.binder-introduction .binder-introduction-lead {
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    line-height: 1.45;
+}
+
+.binder-section {
+    padding: clamp(4rem, 7vw, 6rem) max(1rem, calc((100% - 1320px) / 2));
+    background:
+        radial-gradient(circle at 90% 10%, rgba(245, 215, 220, 0.12), transparent 25%),
+        #263029;
+    color: var(--white);
+}
+
+.binder-section-heading {
+    display: flex;
+    max-width: 1200px;
+    margin: 0 auto clamp(2rem, 5vw, 3.5rem);
+    align-items: end;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.binder-section-heading h2 {
+    font-size: clamp(2.8rem, 6vw, 5rem);
+}
+
+.binder-section-heading > p {
+    max-width: 31rem;
+    margin: 0 0 0.5rem;
+    color: #d7ddd4;
+}
+
+.binder {
+    max-width: 1320px;
+    margin: 0 auto;
+}
+
+.binder-toolbar {
+    display: grid;
+    max-width: 1200px;
+    margin: 0 auto 1rem;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+}
+
+.binder-control,
+.binder-jump button {
+    min-height: 2.75rem;
+    padding: 0.6rem 1rem;
+    color: var(--white);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+}
+
+.binder-control:first-child {
+    justify-self: start;
+}
+
+.binder-control:last-child {
+    justify-self: end;
+}
+
+.binder-control:hover:not(:disabled),
+.binder-jump button:hover {
+    color: var(--ink);
+    background: var(--blush);
+    border-color: var(--blush);
+}
+
+.binder-control:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.binder-position {
+    margin: 0;
+    color: #d7ddd4;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.binder-viewport {
+    padding: 1.1rem;
+    overflow-x: auto;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 1.8rem;
+    scrollbar-color: var(--pink) transparent;
+}
+
+.binder-viewport:focus-visible {
+    outline-color: var(--blush);
+}
+
+.binder-book {
+    position: relative;
+    display: grid;
+    min-width: 680px;
+    padding: clamp(1rem, 2vw, 1.6rem);
+    grid-template-columns: 1fr 1fr;
+    background: #171b18;
+    border: 3px solid #0e110f;
+    border-radius: 1.6rem;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+    transform-origin: center;
+    transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.binder-book::before {
+    position: absolute;
+    z-index: 3;
+    top: 1.1rem;
+    bottom: 1.1rem;
+    left: 50%;
+    width: 1.2rem;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.3), rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.3));
+    border-radius: 50%;
+    content: "";
+    transform: translateX(-50%);
+}
+
+.binder-book.is-turning-forward {
+    opacity: 0.25;
+    transform: perspective(1000px) rotateY(-4deg) scale(0.99);
+}
+
+.binder-book.is-turning-back {
+    opacity: 0.25;
+    transform: perspective(1000px) rotateY(4deg) scale(0.99);
+}
+
+.binder-page {
+    display: grid;
+    min-width: 0;
+    padding: clamp(0.65rem, 1.5vw, 1.15rem);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(0.35rem, 0.85vw, 0.7rem);
+    background: #202622;
+    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.4);
+}
+
+.binder-page--left {
+    border-radius: 1rem 0.15rem 0.15rem 1rem;
+}
+
+.binder-page--right {
+    border-radius: 0.15rem 1rem 1rem 0.15rem;
+}
+
+.binder-page--cover {
+    display: flex;
+    min-height: 510px;
+    padding: 3rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.62);
+    background:
+        radial-gradient(circle at center, rgba(245, 215, 220, 0.08), transparent 35%),
+        #161a17;
+    text-align: center;
+}
+
+.binder-page--cover > span {
+    color: var(--pink);
+    font-size: 2rem;
+}
+
+.binder-page--cover p {
+    font-family: var(--serif);
+    font-size: 1.4rem;
+    line-height: 1.4;
+}
+
+.binder-page--cover small {
+    font-family: var(--sans);
+    font-size: 0.65rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.binder-pocket {
+    position: relative;
+    min-width: 0;
+    aspect-ratio: 68 / 97;
+    padding: 0;
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.08)),
+        #181c19;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.38rem;
+    box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.13);
+    color: rgba(255, 255, 255, 0.35);
+    cursor: default;
+}
+
+.binder-pocket::after {
+    position: absolute;
+    z-index: 2;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 45%, rgba(255, 255, 255, 0.11) 51%, transparent 57%);
+    content: "";
+    pointer-events: none;
+}
+
+.binder-pocket.has-card {
+    cursor: zoom-in;
+}
+
+.binder-pocket.has-card:hover {
+    border-color: var(--pink);
+    transform: translateY(-2px);
+}
+
+.binder-pocket img {
+    position: absolute;
+    inset: 3%;
+    width: 94%;
+    height: 94%;
+    object-fit: contain;
+}
+
+.binder-pocket-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    font-size: clamp(0.55rem, 1vw, 0.72rem);
+    font-variant-numeric: tabular-nums;
+    transform: translate(-50%, -50%);
+}
+
+.binder-pocket.has-card .binder-pocket-number {
+    opacity: 0;
+}
+
+.binder-jump {
+    display: flex;
+    max-width: 1200px;
+    margin: 1.25rem auto 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.binder-jump label {
+    color: #d7ddd4;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.binder-jump > div {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.binder-jump input {
+    width: 8rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.8rem;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid transparent;
+    border-radius: 0.7rem;
+    font: inherit;
+}
+
+.binder-message {
+    padding: 1rem;
+    color: var(--ink);
+    background: var(--blush);
+    border-radius: 0.75rem;
+}
+
+.binder-notes h2 {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+}
+
+.binder-notes p {
+    margin-top: 0;
+    color: var(--muted);
+}
+
+.binder-file-note {
+    padding: 1rem 1.15rem;
+    background: var(--paper-deep);
+    border-left: 3px solid var(--pink);
+    border-radius: 0 0.65rem 0.65rem 0;
+}
+
+.binder-file-note span {
+    margin-right: 0.5rem;
+    color: var(--pink-dark);
+}
+
+.card-dialog {
+    width: min(calc(100% - 2rem), 520px);
+    max-height: calc(100svh - 2rem);
+    padding: 0;
+    overflow: hidden;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 1.25rem;
+    box-shadow: 0 30px 100px rgba(0, 0, 0, 0.42);
+}
+
+.card-dialog::backdrop {
+    background: rgba(31, 28, 29, 0.78);
+    backdrop-filter: blur(4px);
+}
+
+.card-dialog-inner {
+    padding: 1rem;
+}
+
+.card-dialog-heading {
+    display: flex;
+    margin-bottom: 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-dialog-heading p {
+    margin: 0;
+    color: var(--pink-dark);
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.card-dialog-heading button {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    color: var(--ink);
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.card-dialog img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    max-height: calc(100svh - 7rem);
+    margin: 0 auto;
+    border-radius: 0.65rem;
+}
+
+.project-card-binder .binder-preview-art {
+    position: absolute;
+    z-index: 1;
+    display: flex;
+    width: 58%;
+    aspect-ratio: 0.72;
+    align-items: center;
+    justify-content: center;
+    color: #f7e8eb;
+    background: #313a33;
+    border: 4px solid #1e2520;
+    border-radius: 0.9rem 1.2rem 1.2rem 0.9rem;
+    box-shadow: 0 18px 35px rgba(48, 42, 44, 0.2), inset -8px 0 0 rgba(0, 0, 0, 0.15);
+    transform: rotate(-5deg);
+}
+
+.project-card-binder .binder-preview-art::after {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.35rem;
+    bottom: 0.4rem;
+    width: 0.18rem;
+    background: var(--pink);
+    border-radius: 999px;
+    content: "";
+}
+
+.binder-preview-art i {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    width: 0.7rem;
+    aspect-ratio: 1;
+    background: var(--pink);
+    border-radius: 65% 0 65% 40%;
+    transform: rotate(45deg);
+}
+
+.binder-preview-art b {
+    font-family: var(--serif);
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    font-weight: 400;
+    line-height: 1.05;
+    text-align: center;
+}
+
+.project-card-binder.has-image .binder-preview-art {
+    display: none;
+}
+
 .site-footer {
     display: flex;
     width: min(calc(100% - 3rem), var(--content));
@@ -824,6 +1270,38 @@ code {
 
     .project-detail-image {
         min-height: 330px;
+    }
+
+    .binder-introduction,
+    .binder-notes {
+        grid-template-columns: 1fr;
+    }
+
+    .binder-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .binder-toolbar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .binder-position {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .binder-viewport {
+        padding: 0.6rem;
+    }
+
+    .binder-book {
+        min-width: 650px;
+    }
+
+    .binder-jump {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .site-footer {

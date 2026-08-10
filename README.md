@@ -45,3 +45,10 @@ The project overview is in `projects/index.html`. The initial detail pages are:
 Each page contains comments beside the temporary title and copy that should be
 replaced. A project's homepage preview, overview card, detail page, and images all
 live in or reference that project's own folder.
+
+### Update the Pokémon binder
+
+Project 01 is an interactive 1,088-pocket Pokémon TCG binder. Add WebP card images
+to `projects/project-1/images/cards/` using the pocket number as the filename:
+`card-1.webp`, `card-2.webp`, `card-3.webp`, and so on. No HTML or JavaScript edit
+is needed. See `projects/project-1/images/README.md` for the pocket order.
