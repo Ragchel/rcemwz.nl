@@ -3,9 +3,9 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="Project 01 by Rachel.">
+        <meta name="description" content="Leaf through Rachel's Pokémon TCG collection in an interactive 16-pocket binder.">
         <meta name="theme-color" content="#fffaf7">
-        <title>Project 01 — rcemwz</title>
+        <title>My Pokémon TCG binder — rcemwz</title>
         <link rel="stylesheet" href="../../styles.css">
         <script src="../../script.js" defer></script>
     </head>
@@ -22,37 +22,81 @@
             </nav>
         </header>
 
-        <main id="main-content" class="project-detail">
+        <main id="main-content" class="project-detail binder-project">
             <article>
-                <header class="project-detail-hero">
-                    <p class="eyebrow">Project 01</p>
-                    <h1>Project one</h1>
-                    <p class="hero-intro">Project details will be added here.</p>
-                    <!-- Replace the temporary title and introduction above. -->
+                <header class="project-detail-hero binder-hero">
+                    <p class="eyebrow">Project 01 · The collection</p>
+                    <h1>My Pokémon<br>TCG binder</h1>
+                    <p class="hero-intro">A page-by-page home for my collection. Open the binder and have a look around, just as you would in real life.</p>
+                    <a class="text-link" href="#open-binder">Open the binder <span aria-hidden="true">↓</span></a>
                 </header>
 
-                <div class="project-detail-body">
-                    <figure class="image-slot project-detail-image" data-image="images/preview.webp" data-alt="First project preview">
-                        <!-- Uses the preview stored in this project's images folder. -->
-                    </figure>
-
-                    <div class="project-notes">
-                        <section aria-labelledby="story-title">
-                            <p class="eyebrow">The story</p>
-                            <h2 id="story-title">Why I made it</h2>
-                            <p>Notes about the idea, motivation, and what made this project fun will go here.</p>
-                        </section>
-                        <section aria-labelledby="details-title">
-                            <p class="eyebrow">The details</p>
-                            <h2 id="details-title">How it came together</h2>
-                            <p>Notes about the process, tools, current status, and useful project links will go here.</p>
-                        </section>
-                    </div>
-                    <!-- Replace the clearly marked temporary project notes above; do not publish private links or details. -->
-                    <a class="project-back" href="../index.html"><span aria-hidden="true">←&nbsp;</span> All projects</a>
+                <div class="binder-introduction">
+                    <p class="binder-introduction-lead">I wanted my cards to be as enjoyable to browse online as they are laid out on the table.</p>
+                    <p>This digital version follows my 16-pocket Vault X binder: four cards across, four down, with every numbered pocket kept in its real position. Empty pockets stay visible, because a collection in progress is part of the fun.</p>
                 </div>
+
+                <section id="open-binder" class="binder-section" aria-labelledby="binder-title">
+                    <div class="binder-section-heading">
+                        <div>
+                            <p class="eyebrow">Leaf through the collection</p>
+                            <h2 id="binder-title">The binder</h2>
+                        </div>
+                        <p>Use the arrows, your keyboard, or jump to a pocket. Select a card to see it up close.</p>
+                    </div>
+
+                    <div class="binder" data-binder data-total-cards="1088" data-card-path="images/cards/card-" data-card-extension="webp">
+                        <div class="binder-toolbar">
+                            <button class="binder-control" type="button" data-binder-previous>
+                                <span aria-hidden="true">←</span> Previous
+                            </button>
+                            <p class="binder-position" data-binder-position aria-live="polite">Opening the binder…</p>
+                            <button class="binder-control" type="button" data-binder-next>
+                                Next <span aria-hidden="true">→</span>
+                            </button>
+                        </div>
+
+                        <div class="binder-viewport" tabindex="0" aria-label="Interactive Pokémon card binder">
+                            <div class="binder-book" data-binder-book></div>
+                        </div>
+
+                        <form class="binder-jump" data-binder-jump>
+                            <label for="pocket-number">Jump to pocket</label>
+                            <div>
+                                <input id="pocket-number" name="pocket" type="number" min="1" max="1088" inputmode="numeric" placeholder="e.g. 151">
+                                <button type="submit">Go</button>
+                            </div>
+                        </form>
+
+                        <noscript>
+                            <p class="binder-message">JavaScript is needed to leaf through the binder. The rest of this project page remains available without it.</p>
+                        </noscript>
+                    </div>
+                </section>
+
+                <section class="binder-notes" aria-labelledby="binder-notes-title">
+                    <div>
+                        <p class="eyebrow">A growing collection</p>
+                        <h2 id="binder-notes-title">One pocket at a time</h2>
+                    </div>
+                    <div>
+                        <p>I can add to this binder without rebuilding the page. Each image is matched to its pocket number, so the digital collection keeps the same order as the physical one.</p>
+                        <p class="binder-file-note"><span aria-hidden="true">✿</span> A file named <code>card-25.webp</code> appears in pocket 25.</p>
+                        <a class="project-back" href="../index.html"><span aria-hidden="true">←&nbsp;</span> All projects</a>
+                    </div>
+                </section>
             </article>
         </main>
+
+        <dialog class="card-dialog" data-card-dialog aria-labelledby="card-dialog-title">
+            <div class="card-dialog-inner">
+                <div class="card-dialog-heading">
+                    <p id="card-dialog-title" data-card-dialog-title>Card</p>
+                    <button type="button" data-card-dialog-close aria-label="Close card view">×</button>
+                </div>
+                <img data-card-dialog-image alt="">
+            </div>
+        </dialog>
 
         <footer class="site-footer">
             <p>© 2026 rcemwz <span aria-hidden="true">·</span> Made with care and a few cherry blossoms.</p>
