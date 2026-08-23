@@ -106,8 +106,8 @@ function renderResult(container, result) {
         <span class="cf-result-status ${statusClass}">${statusText}</span>
         <dl>
             <dt>Speed reduction</dt><dd>${result.speedReductionEff.toFixed(1)}%</dd>
-            <dt>Field duration</dt><dd>${formatSeconds(result.durationEff)}</dd>
-            <dt>Field cooldown</dt><dd>${formatSeconds(result.cooldownEff)}</dd>
+            <dt>Duration</dt><dd>${formatSeconds(result.durationEff)}</dd>
+            <dt>Cooldown</dt><dd>${formatSeconds(result.cooldownEff)}</dd>
             <dt>${marginLabel}</dt><dd>${formatSeconds(Math.abs(result.marginSeconds))}</dd>
         </dl>
     `;
@@ -219,25 +219,34 @@ function renderWorkspace(workspace, data) {
 
     workspace.querySelector('[data-cf-planner-form]').addEventListener('submit', (event) => {
         event.preventDefault();
-        const target = Number(workspace.querySelector('[data-cf-target]').value);
         const resultEl = workspace.querySelector('[data-cf-planner-result]');
 
-        const loadouts = ['normal', 'tournament'].map((id) => loadoutInputs(data, state[id]));
-        const best = findCheapestInvestment(data.levels, loadouts, target);
+        try {
+            const target = Number(workspace.querySelector('[data-cf-target]').value);
+            if (!Number.isFinite(target)) {
+                resultEl.innerHTML = '<p>Enter a target speed reduction first.</p>';
+                return;
+            }
 
-        if (!best) {
-            resultEl.innerHTML = '<p>No stone investment within the available levels reaches that target on both loadouts. Try a lower target.</p>';
-            return;
+            const loadouts = ['normal', 'tournament'].map((id) => loadoutInputs(data, state[id]));
+            const best = findCheapestInvestment(data.levels, loadouts, target);
+
+            if (!best) {
+                resultEl.innerHTML = '<p>No stone investment within the available levels reaches that target on both loadouts. Try a lower target.</p>';
+                return;
+            }
+
+            const changes = [];
+            if (best.levels.duration !== data.levels.duration) changes.push(`Duration to level ${best.levels.duration}`);
+            if (best.levels.cooldown !== data.levels.cooldown) changes.push(`Cooldown to level ${best.levels.cooldown}`);
+            if (best.levels.speed !== data.levels.speed) changes.push(`Speed Reduction to level ${best.levels.speed}`);
+
+            resultEl.innerHTML = changes.length === 0
+                ? '<p>You already meet that target on both loadouts with permanent uptime.</p>'
+                : `<p>Level up: </p><ul>${changes.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul><p>${best.additionalCost.toLocaleString()} more Power Stones, keeping permanent uptime on both loadouts.</p>`;
+        } catch (error) {
+            resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }
-
-        const changes = [];
-        if (best.levels.duration !== data.levels.duration) changes.push(`Field Duration to level ${best.levels.duration}`);
-        if (best.levels.cooldown !== data.levels.cooldown) changes.push(`Field Cooldown to level ${best.levels.cooldown}`);
-        if (best.levels.speed !== data.levels.speed) changes.push(`Speed Reduction to level ${best.levels.speed}`);
-
-        resultEl.innerHTML = changes.length === 0
-            ? '<p>You already meet that target on both loadouts with permanent uptime.</p>'
-            : `<p>Level up: </p><ul>${changes.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul><p>${best.additionalCost.toLocaleString()} more Power Stones, keeping permanent uptime on both loadouts.</p>`;
     });
 }
 

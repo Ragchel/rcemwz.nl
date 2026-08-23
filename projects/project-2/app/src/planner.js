@@ -22,7 +22,9 @@ function findCheapestInvestment(currentLevels, loadouts, targetSlowPercent) {
         for (let cooldown = currentLevels.cooldown; cooldown <= maxLevel('Cooldown'); cooldown += 1) {
             for (let duration = currentLevels.duration; duration <= maxLevel('Duration'); duration += 1) {
                 const levels = { duration, cooldown, speed };
-                const results = loadouts.map((loadout) => computeEffectiveChronoField({ levels, ...loadout }));
+                // `levels` must come after the spread — `loadout` carries its own
+                // (current, unmodified) `levels` field that would otherwise win.
+                const results = loadouts.map((loadout) => computeEffectiveChronoField({ ...loadout, levels }));
 
                 const allPermanent = results.every((result) => result.permanent);
                 const allAtTarget = results.every((result) => result.speedReductionEff >= targetSlowPercent);
