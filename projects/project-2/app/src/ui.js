@@ -36,9 +36,11 @@ function isSlotLocked(module, slot, lockOverrides) {
 }
 
 /**
- * Every slot the planner is free to suggest something for: not-yet-unlocked
- * or explicitly marked Changeable, across whichever modules are currently
- * selected in either loadout.
+ * Every slot the planner is free to suggest something for: whichever slots
+ * are explicitly marked Changeable, across whichever modules are currently
+ * selected in either loadout. Not-yet-unlocked slots default to locked, same
+ * as any real substat — the player has to mark one Changeable before the
+ * planner will suggest anything for it.
  */
 function collectEligibleSlots(data, state, lockOverrides) {
     const moduleKeys = new Set([
@@ -53,8 +55,7 @@ function collectEligibleSlots(data, state, lockOverrides) {
         if (!module) continue;
 
         for (const slot of module.slots) {
-            const changeable = !slot.unlocked || !isSlotLocked(module, slot, lockOverrides);
-            if (!changeable) continue;
+            if (isSlotLocked(module, slot, lockOverrides)) continue;
             eligible.push({ moduleKey: module.key, moduleLabel: module.label, slotNumber: slot.slot, note: slot.note || null });
         }
     }
@@ -96,23 +97,24 @@ function slotsHtml(module, lockOverrides) {
     if (!module) return '<p class="cf-module-slots-empty">Choose a module to see its substats.</p>';
 
     const items = module.slots.map((slot) => {
-        if (!slot.unlocked) {
-            const note = slot.note ? ` — ${escapeHtml(slot.note)}` : '';
-            return `<li class="cf-module-slot is-empty">Slot ${slot.slot}: Not yet unlocked${note}</li>`;
-        }
         const locked = isSlotLocked(module, slot, lockOverrides);
         const classes = ['cf-module-slot'];
-        if (slot.isChronoField) classes.push('is-cf');
+        if (slot.unlocked && slot.isChronoField) classes.push('is-cf');
+        if (!slot.unlocked) classes.push('is-empty');
         if (locked) classes.push('is-locked');
-        const rarity = slot.rarity ? `${escapeHtml(slot.rarity)} ` : '';
-        const value = slot.displayValue ? ` ${escapeHtml(slot.displayValue)}` : '';
+
+        const note = slot.note ? ` — ${escapeHtml(slot.note)}` : '';
+        const label = slot.unlocked
+            ? `${slot.rarity ? `${escapeHtml(slot.rarity)} ` : ''}${escapeHtml(slot.label)}${slot.displayValue ? ` ${escapeHtml(slot.displayValue)}` : ''}`
+            : `Not yet unlocked${note}`;
+
         return `
             <li class="${classes.join(' ')}">
-                <span class="cf-module-slot-label">Slot ${slot.slot}: ${rarity}${escapeHtml(slot.label)}${value}</span>
+                <span class="cf-module-slot-label">Slot ${slot.slot}: ${label}</span>
                 <button type="button" class="cf-module-slot-toggle" data-cf-slot-toggle
                     data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
                     aria-pressed="${locked ? 'true' : 'false'}"
-                    title="Click to mark this substat as locked or changeable">${locked ? 'Locked' : 'Changeable'}</button>
+                    title="Click to mark this slot as locked or changeable">${locked ? 'Locked' : 'Changeable'}</button>
             </li>`;
     });
 

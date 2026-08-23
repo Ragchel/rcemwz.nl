@@ -42,6 +42,9 @@ function decodeSlots(effects, effectLocked) {
             return {
                 slot,
                 unlocked: false,
+                // Defaults locked like any real substat: the player has to
+                // explicitly mark it Changeable before the planner touches it.
+                locked: true,
                 note: slot === MODULE_SUBSTAT_SLOT_COUNT ? `Needs module level ${EIGHTH_SLOT_MODULE_LEVEL}` : null,
             };
         }
