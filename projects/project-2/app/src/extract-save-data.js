@@ -4,6 +4,7 @@ const {
     MODULE_SAVE_ASSIST_SLOTS_KEY,
 } = require('thetowersdk/internal/save/modules');
 const { decodeModuleSubstats } = require('thetowersdk/internal/save/module-effects-decode');
+const { assistEfficiency } = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
 const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 
 // Stable save-array positions from thetowersdk@0.5.3. Reading these two lab
@@ -114,8 +115,14 @@ function numberAt(values, index) {
     return Number.isFinite(value) ? value : null;
 }
 
-/** Fraction (0-1) applied to an assist-slot Core module's substat contribution. */
+/**
+ * The assist-slot Core module's substat efficiency: the fraction (0-1)
+ * applied to an assist module's substat contribution, plus the raw stone
+ * level behind it (the lab level is a fixed input, but the stone level is
+ * something the planner can consider leveling further).
+ */
 function readCoreAssistEfficiency(parsedRoot, warnings) {
+    const fallback = { fraction: 0, stoneLevel: 0, labLevel: 0 };
     try {
         const coreSlotIndex = Object.entries(MODULE_SAVE_ASSIST_TYPE_TO_CATEGORY)
             .find(([, category]) => category === 'Core')?.[0];
@@ -124,18 +131,18 @@ function readCoreAssistEfficiency(parsedRoot, warnings) {
             ? assistSlots[Number(coreSlotIndex)]
             : null;
         const stoneLevel = coreSlot?.substatEfficiencyLevel;
-
         const labLevel = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], ASSIST_CORE_SUBSTATS_LAB_INDEX) ?? 0;
 
         if (typeof stoneLevel !== 'number') {
             warnings.push('Could not read assist-module efficiency from this save — assuming 0% for assist Core substats.');
-            return 0;
+            return fallback;
         }
 
-        return Math.max(0, Math.min(1, (1 + stoneLevel + labLevel) / 100));
+        const fraction = Math.max(0, Math.min(1, assistEfficiency({ hasAssist: true, stoneLevel, labLevel })));
+        return { fraction, stoneLevel, labLevel };
     } catch {
         warnings.push('Could not read assist-module efficiency from this save — assuming 0% for assist Core substats.');
-        return 0;
+        return fallback;
     }
 }
 
@@ -176,12 +183,18 @@ function extractSaveData(parsedRoot) {
     const modulesExtract = readModulesFromSaveRoot(parsedRoot);
 
     const stones = typeof parsedRoot?.stones === 'number' ? parsedRoot.stones : null;
+    const assistCoreEfficiencyInfo = readCoreAssistEfficiency(parsedRoot, warnings);
 
     return {
         stones,
         levels: readChronoFieldLevels(parsedRoot, warnings),
         durationLabMaxed: readDurationLabMaxed(parsedRoot, warnings),
-        assistCoreEfficiency: readCoreAssistEfficiency(parsedRoot, warnings),
+        assistCoreEfficiency: assistCoreEfficiencyInfo.fraction,
+        // The stone-level side of assist efficiency — separate from the
+        // fraction above because the planner can consider leveling it
+        // further, while the lab level stays a fixed input like other labs.
+        assistCoreEfficiencyStoneLevel: assistCoreEfficiencyInfo.stoneLevel,
+        assistCoreEfficiencyLabLevel: assistCoreEfficiencyInfo.labLevel,
         coreModules: collectCoreModules(modulesExtract, warnings),
         defaultPrimaryKey: findEquippedCoreKey(modulesExtract, 'primary'),
         defaultAssistKey: findEquippedCoreKey(modulesExtract, 'assist'),

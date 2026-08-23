@@ -75,12 +75,17 @@ function renderPlanHtml(plan, currentLevels) {
         parts.push(`<p>Get these substats:</p><ul>${items.join('')}</ul>`);
     }
 
+    const levelChanges = [];
     if (plan.levels) {
-        const changes = [];
-        if (plan.levels.duration !== currentLevels.duration) changes.push(`Duration to level ${plan.levels.duration}`);
-        if (plan.levels.cooldown !== currentLevels.cooldown) changes.push(`Cooldown to level ${plan.levels.cooldown}`);
-        if (plan.levels.speed !== currentLevels.speed) changes.push(`Speed Reduction to level ${plan.levels.speed}`);
-        parts.push(`<p>Level up:</p><ul>${changes.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
+        if (plan.levels.duration !== currentLevels.duration) levelChanges.push(`Duration to level ${plan.levels.duration}`);
+        if (plan.levels.cooldown !== currentLevels.cooldown) levelChanges.push(`Cooldown to level ${plan.levels.cooldown}`);
+        if (plan.levels.speed !== currentLevels.speed) levelChanges.push(`Speed Reduction to level ${plan.levels.speed}`);
+    }
+    if (plan.assistEfficiencyLevel != null) {
+        levelChanges.push(`Assist Module Substats (Core) to level ${plan.assistEfficiencyLevel}`);
+    }
+    if (levelChanges.length > 0) {
+        parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
     }
 
     if (plan.additionalCost > 0) {
@@ -303,7 +308,8 @@ function renderWorkspace(workspace, data) {
             const plan = findCheapestPlan({
                 currentLevels: data.levels,
                 coreModules: data.coreModules,
-                assistEfficiency: data.assistCoreEfficiency,
+                assistEfficiencyStoneLevel: data.assistCoreEfficiencyStoneLevel,
+                assistEfficiencyLabLevel: data.assistCoreEfficiencyLabLevel,
                 loadouts: loadoutContexts,
                 eligibleSlots: collectEligibleSlots(modulesByKey, state, lockOverrides),
                 fixedOverrides: new Map(),

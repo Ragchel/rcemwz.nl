@@ -1,5 +1,23 @@
 const { CHRONO_FIELD_STATS } = require('./chrono-field-stones');
 const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
+const {
+    assistEfficiency: computeAssistEfficiencyFraction,
+    cumulativeAssistEfficiencyStoneCost,
+    maxStoneLevel: assistEfficiencyMaxStoneLevel,
+} = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
+
+// Only the "substat" efficiency track matters here — Chrono Field's
+// contributions are all substats, never the "multiplier" track.
+const ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL = assistEfficiencyMaxStoneLevel('substat');
+
+function assistCoreEfficiencyFraction(stoneLevel, labLevel) {
+    return Math.max(0, Math.min(1, computeAssistEfficiencyFraction({ hasAssist: true, stoneLevel, labLevel })));
+}
+
+/** Stones to take the assist Core substat-efficiency slot from one level to another. */
+function assistCoreEfficiencyCumulativeCost(fromLevel, toLevel) {
+    return cumulativeAssistEfficiencyStoneCost('substat', fromLevel, toLevel);
+}
 
 const CF_STATS = CHRONO_FIELD_STATS;
 const STAT_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => [stat.name, stat]));
@@ -184,6 +202,7 @@ module.exports = {
     CF_SUBSTAT_OPTIONS,
     CF_SUBSTAT_OPTION_LIST,
     RARITY_TIER,
+    ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL,
     maxLevel,
     levelValue,
     cumulativeCost,
@@ -192,4 +211,6 @@ module.exports = {
     sumChronoFieldContributions,
     usedChronoFieldStats,
     slotOverrideKey,
+    assistCoreEfficiencyFraction,
+    assistCoreEfficiencyCumulativeCost,
 };

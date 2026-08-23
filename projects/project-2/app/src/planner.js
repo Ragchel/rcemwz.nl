@@ -7,7 +7,10 @@ const {
     CF_SUBSTAT_OPTIONS,
     CF_SUBSTAT_OPTION_LIST,
     RARITY_TIER,
+    ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL,
     slotOverrideKey,
+    assistCoreEfficiencyFraction,
+    assistCoreEfficiencyCumulativeCost,
 } = require('./chrono-field-math');
 
 /**
@@ -208,13 +211,14 @@ function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loado
 /**
  * The full plan: which (if any) not-yet-decided substat slots to fill, and
  * which (if any) additional stone levels to buy, to reach `target` on every
- * loadout while keeping permanent uptime. `fixedOverrides` are the player's
- * own manual picks (from the "plan a reroll" selects) — treated as already
- * decided; only `eligibleSlots` without one of those are up for the planner
- * to suggest. Returns null if the target is unreachable even after using
- * every eligible slot at its best rarity and maxing every stone level.
+ * loadout while keeping permanent uptime, at one fixed assist-efficiency
+ * fraction. `fixedOverrides` are the player's own manual picks (from the
+ * "plan a reroll" selects) — treated as already decided; only
+ * `eligibleSlots` without one of those are up for the planner to suggest.
+ * Returns null if the target is unreachable even after using every eligible
+ * slot at its best rarity and maxing every stone level.
  */
-function findCheapestPlan({ currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target }) {
+function findCheapestPlanAtEfficiency({ currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target }) {
     const modulesByKey = new Map(coreModules.map((module) => [module.key, module]));
     const baseline = evaluateLoadouts(loadouts, modulesByKey, assistEfficiency, fixedOverrides, currentLevels);
     if (isSatisfied(baseline, target)) {
@@ -251,6 +255,44 @@ function findCheapestPlan({ currentLevels, coreModules, assistEfficiency, loadou
         assignment: greedyAssignment,
         additionalCost: best.additionalCost,
     };
+}
+
+/**
+ * The full plan, also considering whether leveling up the assist Core
+ * module's substat efficiency — a separate stone investment from Duration/
+ * Cooldown/Speed and from substat slots — makes the target cheaper overall.
+ * A higher efficiency only ever helps (it scales the assist module's
+ * contribution up), so this sweeps every stone level from the player's
+ * current one to the track's cap, combining each with the cheapest
+ * level/substat plan at that efficiency, and keeps the cheapest total.
+ */
+function findCheapestPlan({
+    currentLevels, coreModules, assistEfficiencyStoneLevel, assistEfficiencyLabLevel,
+    loadouts, eligibleSlots, fixedOverrides, target,
+}) {
+    let best = null;
+
+    for (let stoneLevel = assistEfficiencyStoneLevel; stoneLevel <= ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL; stoneLevel += 1) {
+        const assistEfficiency = assistCoreEfficiencyFraction(stoneLevel, assistEfficiencyLabLevel);
+        const innerPlan = findCheapestPlanAtEfficiency({
+            currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target,
+        });
+        if (!innerPlan) continue;
+
+        const efficiencyCost = assistCoreEfficiencyCumulativeCost(assistEfficiencyStoneLevel, stoneLevel) ?? 0;
+        const totalCost = innerPlan.additionalCost + efficiencyCost;
+
+        if (!best || totalCost < best.additionalCost) {
+            best = {
+                levels: innerPlan.levels,
+                assignment: innerPlan.assignment,
+                assistEfficiencyLevel: stoneLevel !== assistEfficiencyStoneLevel ? stoneLevel : null,
+                additionalCost: totalCost,
+            };
+        }
+    }
+
+    return best;
 }
 
 module.exports = { findCheapestInvestment, findCheapestPlan };
