@@ -20,12 +20,6 @@ const CF_SUBSTAT_LABELS = {
     'Chrono Field - Speed Reduction': 'speedReduction',
 };
 
-function parseSignedNumber(text) {
-    if (typeof text !== 'string') return null;
-    const match = text.match(/-?\d+(\.\d+)?/);
-    return match ? parseFloat(match[0]) : null;
-}
-
 const MODULE_SUBSTAT_SLOT_COUNT = 8;
 // Confirmed only for the 8th slot (player-confirmed from live gameplay, not
 // in SDK data). Slots 1-7's own unlock thresholds aren't known, so those are
@@ -65,18 +59,6 @@ function decodeSlots(effects, effectLocked) {
     });
 }
 
-/** Sums a Core module's Chrono Field substat contributions from its raw effect ids. */
-function sumChronoFieldSubstats(slots) {
-    const totals = { duration: 0, cooldown: 0, speedReduction: 0 };
-    for (const slot of slots) {
-        if (!slot.unlocked || !slot.isChronoField) continue;
-        const key = CF_SUBSTAT_LABELS[slot.label];
-        const value = parseSignedNumber(slot.displayValue);
-        if (key && value != null) totals[key] += value;
-    }
-    return totals;
-}
-
 function friendlyModuleLabel(rarityLabel, mappedName, note) {
     const rarity = rarityLabel || 'Unknown rarity';
     const name = mappedName || 'Core module';
@@ -99,7 +81,6 @@ function collectCoreModules(modulesExtract, warnings) {
             role: item.role,
             level: item.level,
             slots,
-            cf: sumChronoFieldSubstats(slots),
         });
     }
 
@@ -112,7 +93,6 @@ function collectCoreModules(modulesExtract, warnings) {
             role: null,
             level: item.level,
             slots,
-            cf: sumChronoFieldSubstats(slots),
         });
     });
 

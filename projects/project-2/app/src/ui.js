@@ -1,10 +1,20 @@
 const { decodePlayerInfoSaveBytes } = require('./decode-save');
 const { extractSaveData } = require('./extract-save-data');
-const { computeEffectiveChronoField } = require('./chrono-field-math');
+const {
+    computeEffectiveChronoField,
+    sumChronoFieldContributions,
+    slotOverrideKey,
+    CF_SUBSTAT_OPTIONS,
+} = require('./chrono-field-math');
 const { findCheapestInvestment } = require('./planner');
 
 const NONE_KEY = '__none__';
 const EMPTY_CF = { duration: 0, cooldown: 0, speedReduction: 0 };
+const CF_STAT_LABELS = {
+    duration: 'Chrono Field Duration',
+    cooldown: 'Chrono Field Cooldown',
+    speedReduction: 'Chrono Field Speed Reduction',
+};
 
 function moduleOptionsHtml(coreModules, selectedKey) {
     const options = [`<option value="${NONE_KEY}"${selectedKey === NONE_KEY ? ' selected' : ''}>None equipped</option>`];
@@ -21,23 +31,44 @@ function escapeHtml(text) {
     })[char]);
 }
 
-function slotLockKey(moduleKey, slotNumber) {
-    return `${moduleKey}:${slotNumber}`;
-}
-
 /** Whether a slot reads as locked: the save's own state, unless the player has toggled it here. */
 function isSlotLocked(module, slot, lockOverrides) {
-    const key = slotLockKey(module.key, slot.slot);
+    const key = slotOverrideKey(module.key, slot.slot);
     return lockOverrides.has(key) ? lockOverrides.get(key) : slot.locked;
 }
 
-function slotsHtml(module, lockOverrides) {
+/** "Plan a reroll here" — lets the player try a hypothetical Chrono Field substat for a slot. */
+function hypotheticalSelectHtml(module, slot, hypotheticalOverrides) {
+    const key = slotOverrideKey(module.key, slot.slot);
+    const current = hypotheticalOverrides.get(key);
+    const options = ['<option value="">No change</option>'];
+
+    for (const stat of Object.keys(CF_SUBSTAT_OPTIONS)) {
+        for (const { rarity, value } of CF_SUBSTAT_OPTIONS[stat]) {
+            const optionValue = `${stat}:${value}`;
+            const selected = current && current.stat === stat && current.value === value ? ' selected' : '';
+            const sign = value > 0 ? '+' : '';
+            const unit = stat === 'speedReduction' ? '%' : 's';
+            options.push(`<option value="${optionValue}"${selected}>${CF_STAT_LABELS[stat]} ${sign}${value}${unit} (${rarity})</option>`);
+        }
+    }
+
+    return `<select class="cf-slot-hypothetical" data-cf-slot-hypothetical
+        data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
+        aria-label="Plan a reroll for slot ${slot.slot}">${options.join('')}</select>`;
+}
+
+function slotsHtml(module, lockOverrides, hypotheticalOverrides) {
     if (!module) return '<p class="cf-module-slots-empty">Choose a module to see its substats.</p>';
 
     const items = module.slots.map((slot) => {
         if (!slot.unlocked) {
             const note = slot.note ? ` — ${escapeHtml(slot.note)}` : '';
-            return `<li class="cf-module-slot is-empty">Slot ${slot.slot}: Not yet unlocked${note}</li>`;
+            return `
+                <li class="cf-module-slot is-empty">
+                    <span class="cf-module-slot-label">Slot ${slot.slot}: Not yet unlocked${note}</span>
+                    ${hypotheticalSelectHtml(module, slot, hypotheticalOverrides)}
+                </li>`;
         }
         const locked = isSlotLocked(module, slot, lockOverrides);
         const classes = ['cf-module-slot'];
@@ -47,35 +78,55 @@ function slotsHtml(module, lockOverrides) {
         const value = slot.displayValue ? ` ${escapeHtml(slot.displayValue)}` : '';
         return `
             <li class="${classes.join(' ')}">
-                <span class="cf-module-slot-label">Slot ${slot.slot}: ${rarity}${escapeHtml(slot.label)}${value}</span>
-                <button type="button" class="cf-module-slot-toggle" data-cf-slot-toggle
-                    data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
-                    aria-pressed="${locked ? 'true' : 'false'}"
-                    title="Click to mark this substat as locked or changeable">${locked ? 'Locked' : 'Changeable'}</button>
+                <div class="cf-module-slot-row">
+                    <span class="cf-module-slot-label">Slot ${slot.slot}: ${rarity}${escapeHtml(slot.label)}${value}</span>
+                    <button type="button" class="cf-module-slot-toggle" data-cf-slot-toggle
+                        data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
+                        aria-pressed="${locked ? 'true' : 'false'}"
+                        title="Click to mark this substat as locked or changeable">${locked ? 'Locked' : 'Changeable'}</button>
+                </div>
+                ${locked ? '' : hypotheticalSelectHtml(module, slot, hypotheticalOverrides)}
             </li>`;
     });
 
     return `<ul class="cf-module-slots">${items.join('')}</ul>`;
 }
 
-function renderModuleSlots(container, data, key, lockOverrides, onToggle) {
+function renderModuleSlots(container, data, key, lockOverrides, hypotheticalOverrides, onToggle) {
     const module = data.coreModules.find((entry) => entry.key === key);
-    container.innerHTML = slotsHtml(module, lockOverrides);
+    container.innerHTML = slotsHtml(module, lockOverrides, hypotheticalOverrides);
 
     container.querySelectorAll('[data-cf-slot-toggle]').forEach((button) => {
         button.addEventListener('click', () => {
-            const overrideKey = slotLockKey(button.dataset.moduleKey, Number(button.dataset.slot));
+            const overrideKey = slotOverrideKey(button.dataset.moduleKey, Number(button.dataset.slot));
             const currentlyLocked = button.getAttribute('aria-pressed') === 'true';
             lockOverrides.set(overrideKey, !currentlyLocked);
             onToggle();
         });
     });
+
+    container.querySelectorAll('[data-cf-slot-hypothetical]').forEach((select) => {
+        select.addEventListener('change', () => {
+            const overrideKey = slotOverrideKey(select.dataset.moduleKey, Number(select.dataset.slot));
+            if (!select.value) {
+                hypotheticalOverrides.delete(overrideKey);
+            } else {
+                const [stat, value] = select.value.split(':');
+                hypotheticalOverrides.set(overrideKey, { stat, value: Number(value) });
+            }
+            onToggle();
+        });
+    });
 }
 
-function loadoutSubstats(data, primaryKey, assistKey) {
+function moduleContribution(module, hypotheticalOverrides) {
+    return module ? sumChronoFieldContributions(module.slots, module.key, hypotheticalOverrides) : EMPTY_CF;
+}
+
+function loadoutSubstats(data, primaryKey, assistKey, hypotheticalOverrides) {
     const byKey = new Map(data.coreModules.map((module) => [module.key, module]));
-    const primary = byKey.get(primaryKey)?.cf ?? EMPTY_CF;
-    const assist = byKey.get(assistKey)?.cf ?? EMPTY_CF;
+    const primary = moduleContribution(byKey.get(primaryKey), hypotheticalOverrides);
+    const assist = moduleContribution(byKey.get(assistKey), hypotheticalOverrides);
     const efficiency = data.assistCoreEfficiency;
     return {
         duration: primary.duration + assist.duration * efficiency,
@@ -84,10 +135,10 @@ function loadoutSubstats(data, primaryKey, assistKey) {
     };
 }
 
-function loadoutInputs(data, loadoutState) {
+function loadoutInputs(data, loadoutState, hypotheticalOverrides) {
     return {
         levels: data.levels,
-        substats: loadoutSubstats(data, loadoutState.primaryKey, loadoutState.assistKey),
+        substats: loadoutSubstats(data, loadoutState.primaryKey, loadoutState.assistKey, hypotheticalOverrides),
         durationLabMaxed: data.durationLabMaxed,
         runPerkActive: Boolean(loadoutState.runPerkActive),
         battleConditionActive: Boolean(loadoutState.battleConditionActive),
@@ -171,42 +222,48 @@ function renderWorkspace(workspace, data) {
         normal: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, runPerkActive: false },
         tournament: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, battleConditionActive: false },
     };
-    // Shared across both loadout cards: a module's locked/changeable marking
-    // is a property of the module itself, not of which card is showing it.
+    // Both shared across loadout cards: a module's locked/changeable marking
+    // and any hypothetical reroll plan are properties of the module itself,
+    // not of which card is showing it.
     const lockOverrides = new Map();
+    const hypotheticalOverrides = new Map();
 
     function recompute(id) {
         const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
-        const result = computeEffectiveChronoField(loadoutInputs(data, state[id]));
+        const result = computeEffectiveChronoField(loadoutInputs(data, state[id], hypotheticalOverrides));
         renderResult(card.querySelector('[data-cf-result]'), result);
     }
 
-    // A module's locked/changeable marking can be visible on both loadout
-    // cards at once (they can share the same module) — refresh every slot
-    // panel so a toggle in one card stays in sync with the other.
-    function refreshAllSlotPanels() {
+    function recomputeAll() {
+        recompute('normal');
+        recompute('tournament');
+    }
+
+    // A module's locked/changeable marking and hypothetical plan can be
+    // visible on both loadout cards at once (they can share the same
+    // module) — refresh every slot panel and both results so a change in
+    // one card stays in sync with the other.
+    function refreshWorkspace() {
         for (const id of ['normal', 'tournament']) {
             const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
-            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), data, state[id].primaryKey, lockOverrides, refreshAllSlotPanels);
-            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), data, state[id].assistKey, lockOverrides, refreshAllSlotPanels);
+            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), data, state[id].primaryKey, lockOverrides, hypotheticalOverrides, refreshWorkspace);
+            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), data, state[id].assistKey, lockOverrides, hypotheticalOverrides, refreshWorkspace);
         }
+        recomputeAll();
     }
 
     for (const id of ['normal', 'tournament']) {
         const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
         card.querySelector('[data-cf-primary]').addEventListener('change', (event) => {
             state[id].primaryKey = event.target.value;
-            refreshAllSlotPanels();
-            recompute(id);
+            refreshWorkspace();
         });
         card.querySelector('[data-cf-assist]').addEventListener('change', (event) => {
             state[id].assistKey = event.target.value;
-            refreshAllSlotPanels();
-            recompute(id);
+            refreshWorkspace();
         });
-        recompute(id);
     }
-    refreshAllSlotPanels();
+    refreshWorkspace();
 
     workspace.querySelector('[data-cf-run-perk]').addEventListener('change', (event) => {
         state.normal.runPerkActive = event.target.checked;
@@ -228,7 +285,7 @@ function renderWorkspace(workspace, data) {
                 return;
             }
 
-            const loadouts = ['normal', 'tournament'].map((id) => loadoutInputs(data, state[id]));
+            const loadouts = ['normal', 'tournament'].map((id) => loadoutInputs(data, state[id], hypotheticalOverrides));
             const best = findCheapestInvestment(data.levels, loadouts, target);
 
             if (!best) {

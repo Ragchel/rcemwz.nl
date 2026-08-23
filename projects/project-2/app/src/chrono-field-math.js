@@ -6,6 +6,68 @@ const STAT_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => [stat.name, stat]
 // Duration/Speed/Cooldown are permanent, one-way UW stone investments.
 const LEVEL_STAT_KEYS = ['Duration', 'Speed', 'Cooldown'];
 
+const CF_SUBSTAT_LABELS = {
+    'Chrono Field - Duration': 'duration',
+    'Chrono Field - Cooldown': 'cooldown',
+    'Chrono Field - Speed Reduction': 'speedReduction',
+};
+
+/**
+ * Core-module substat rarity values, from the session handoff doc (verified
+ * against the game's compiled code) — not from thetowersdk's own static
+ * catalog, whose "Chrono Field - Duration" Legendary entry is corrupted
+ * ("43s" where the other two tiers and this doc agree on "+4s").
+ */
+const CF_SUBSTAT_OPTIONS = {
+    duration: [
+        { rarity: 'Legendary', value: 4 },
+        { rarity: 'Mythic', value: 7 },
+        { rarity: 'Ancestral', value: 10 },
+    ],
+    cooldown: [
+        { rarity: 'Legendary', value: -4 },
+        { rarity: 'Mythic', value: -7 },
+        { rarity: 'Ancestral', value: -10 },
+    ],
+    speedReduction: [
+        { rarity: 'Epic', value: 3 },
+        { rarity: 'Legendary', value: 8 },
+        { rarity: 'Mythic', value: 11 },
+        { rarity: 'Ancestral', value: 15 },
+    ],
+};
+
+function parseSignedNumber(text) {
+    if (typeof text !== 'string') return null;
+    const match = text.match(/-?\d+(\.\d+)?/);
+    return match ? parseFloat(match[0]) : null;
+}
+
+function slotOverrideKey(moduleKey, slotNumber) {
+    return `${moduleKey}:${slotNumber}`;
+}
+
+/**
+ * A module's Chrono Field contribution, per slot: a hypothetical pick (from
+ * `hypotheticalOverrides`) wins if set, otherwise the slot's real rolled
+ * value counts if it's an unlocked Chrono Field substat, otherwise 0.
+ */
+function sumChronoFieldContributions(slots, moduleKey, hypotheticalOverrides) {
+    const totals = { duration: 0, cooldown: 0, speedReduction: 0 };
+    for (const slot of slots) {
+        const override = hypotheticalOverrides?.get(slotOverrideKey(moduleKey, slot.slot));
+        if (override) {
+            totals[override.stat] += override.value;
+            continue;
+        }
+        if (!slot.unlocked || !slot.isChronoField) continue;
+        const key = CF_SUBSTAT_LABELS[slot.label];
+        const value = parseSignedNumber(slot.displayValue);
+        if (key && value != null) totals[key] += value;
+    }
+    return totals;
+}
+
 function parseTableValue(rawValue) {
     const match = String(rawValue).match(/-?\d+(\.\d+)?/);
     return match ? parseFloat(match[0]) : 0;
@@ -68,8 +130,11 @@ function computeEffectiveChronoField({ levels, substats, durationLabMaxed, runPe
 
 module.exports = {
     LEVEL_STAT_KEYS,
+    CF_SUBSTAT_OPTIONS,
     maxLevel,
     levelValue,
     cumulativeCost,
     computeEffectiveChronoField,
+    sumChronoFieldContributions,
+    slotOverrideKey,
 };
