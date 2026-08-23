@@ -2,14 +2,12 @@ const { decodePlayerInfoSaveBytes } = require('./decode-save');
 const { extractSaveData } = require('./extract-save-data');
 const {
     computeEffectiveChronoField,
-    sumChronoFieldContributions,
+    computeLoadoutSubstats,
     slotOverrideKey,
-    CF_SUBSTAT_OPTIONS,
 } = require('./chrono-field-math');
-const { findCheapestInvestment } = require('./planner');
+const { findCheapestPlan } = require('./planner');
 
 const NONE_KEY = '__none__';
-const EMPTY_CF = { duration: 0, cooldown: 0, speedReduction: 0 };
 const CF_STAT_LABELS = {
     duration: 'Chrono Field Duration',
     cooldown: 'Chrono Field Cooldown',
@@ -37,38 +35,70 @@ function isSlotLocked(module, slot, lockOverrides) {
     return lockOverrides.has(key) ? lockOverrides.get(key) : slot.locked;
 }
 
-/** "Plan a reroll here" — lets the player try a hypothetical Chrono Field substat for a slot. */
-function hypotheticalSelectHtml(module, slot, hypotheticalOverrides) {
-    const key = slotOverrideKey(module.key, slot.slot);
-    const current = hypotheticalOverrides.get(key);
-    const options = ['<option value="">No change</option>'];
+/**
+ * Every slot the planner is free to suggest something for: not-yet-unlocked
+ * or explicitly marked Changeable, across whichever modules are currently
+ * selected in either loadout.
+ */
+function collectEligibleSlots(data, state, lockOverrides) {
+    const moduleKeys = new Set([
+        state.normal.primaryKey, state.normal.assistKey,
+        state.tournament.primaryKey, state.tournament.assistKey,
+    ]);
 
-    for (const stat of Object.keys(CF_SUBSTAT_OPTIONS)) {
-        for (const { rarity, value } of CF_SUBSTAT_OPTIONS[stat]) {
-            const optionValue = `${stat}:${value}`;
-            const selected = current && current.stat === stat && current.value === value ? ' selected' : '';
-            const sign = value > 0 ? '+' : '';
-            const unit = stat === 'speedReduction' ? '%' : 's';
-            options.push(`<option value="${optionValue}"${selected}>${CF_STAT_LABELS[stat]} ${sign}${value}${unit} (${rarity})</option>`);
+    const eligible = [];
+    for (const key of moduleKeys) {
+        if (key === NONE_KEY) continue;
+        const module = data.coreModules.find((entry) => entry.key === key);
+        if (!module) continue;
+
+        for (const slot of module.slots) {
+            const changeable = !slot.unlocked || !isSlotLocked(module, slot, lockOverrides);
+            if (!changeable) continue;
+            eligible.push({ moduleKey: module.key, moduleLabel: module.label, slotNumber: slot.slot, note: slot.note || null });
         }
     }
-
-    return `<select class="cf-slot-hypothetical" data-cf-slot-hypothetical
-        data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
-        aria-label="Plan a reroll for slot ${slot.slot}">${options.join('')}</select>`;
+    return eligible;
 }
 
-function slotsHtml(module, lockOverrides, hypotheticalOverrides) {
+function renderPlanHtml(plan, currentLevels) {
+    const parts = [];
+
+    if (plan.assignment.length > 0) {
+        const items = plan.assignment.map((item) => {
+            const sign = item.value > 0 ? '+' : '';
+            const unit = item.stat === 'speedReduction' ? '%' : 's';
+            const note = item.note ? ` (${item.note})` : '';
+            return `<li>Slot ${item.slotNumber} of ${escapeHtml(item.moduleLabel)}: roll ${CF_STAT_LABELS[item.stat]} ${sign}${item.value}${unit} (${item.rarity})${escapeHtml(note)}</li>`;
+        });
+        parts.push(`<p>Get these substats:</p><ul>${items.join('')}</ul>`);
+    }
+
+    if (plan.levels) {
+        const changes = [];
+        if (plan.levels.duration !== currentLevels.duration) changes.push(`Duration to level ${plan.levels.duration}`);
+        if (plan.levels.cooldown !== currentLevels.cooldown) changes.push(`Cooldown to level ${plan.levels.cooldown}`);
+        if (plan.levels.speed !== currentLevels.speed) changes.push(`Speed Reduction to level ${plan.levels.speed}`);
+        parts.push(`<p>Level up:</p><ul>${changes.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
+    }
+
+    if (plan.additionalCost > 0) {
+        parts.push(`<p>${plan.additionalCost.toLocaleString()} more Power Stones.</p>`);
+    }
+
+    if (parts.length === 0) {
+        return '<p>You already meet that target on both loadouts with permanent uptime.</p>';
+    }
+    return parts.join('');
+}
+
+function slotsHtml(module, lockOverrides) {
     if (!module) return '<p class="cf-module-slots-empty">Choose a module to see its substats.</p>';
 
     const items = module.slots.map((slot) => {
         if (!slot.unlocked) {
             const note = slot.note ? ` — ${escapeHtml(slot.note)}` : '';
-            return `
-                <li class="cf-module-slot is-empty">
-                    <span class="cf-module-slot-label">Slot ${slot.slot}: Not yet unlocked${note}</span>
-                    ${hypotheticalSelectHtml(module, slot, hypotheticalOverrides)}
-                </li>`;
+            return `<li class="cf-module-slot is-empty">Slot ${slot.slot}: Not yet unlocked${note}</li>`;
         }
         const locked = isSlotLocked(module, slot, lockOverrides);
         const classes = ['cf-module-slot'];
@@ -78,23 +108,20 @@ function slotsHtml(module, lockOverrides, hypotheticalOverrides) {
         const value = slot.displayValue ? ` ${escapeHtml(slot.displayValue)}` : '';
         return `
             <li class="${classes.join(' ')}">
-                <div class="cf-module-slot-row">
-                    <span class="cf-module-slot-label">Slot ${slot.slot}: ${rarity}${escapeHtml(slot.label)}${value}</span>
-                    <button type="button" class="cf-module-slot-toggle" data-cf-slot-toggle
-                        data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
-                        aria-pressed="${locked ? 'true' : 'false'}"
-                        title="Click to mark this substat as locked or changeable">${locked ? 'Locked' : 'Changeable'}</button>
-                </div>
-                ${locked ? '' : hypotheticalSelectHtml(module, slot, hypotheticalOverrides)}
+                <span class="cf-module-slot-label">Slot ${slot.slot}: ${rarity}${escapeHtml(slot.label)}${value}</span>
+                <button type="button" class="cf-module-slot-toggle" data-cf-slot-toggle
+                    data-module-key="${escapeHtml(module.key)}" data-slot="${slot.slot}"
+                    aria-pressed="${locked ? 'true' : 'false'}"
+                    title="Click to mark this substat as locked or changeable">${locked ? 'Locked' : 'Changeable'}</button>
             </li>`;
     });
 
     return `<ul class="cf-module-slots">${items.join('')}</ul>`;
 }
 
-function renderModuleSlots(container, data, key, lockOverrides, hypotheticalOverrides, onToggle) {
+function renderModuleSlots(container, data, key, lockOverrides, onToggle) {
     const module = data.coreModules.find((entry) => entry.key === key);
-    container.innerHTML = slotsHtml(module, lockOverrides, hypotheticalOverrides);
+    container.innerHTML = slotsHtml(module, lockOverrides);
 
     container.querySelectorAll('[data-cf-slot-toggle]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -104,41 +131,12 @@ function renderModuleSlots(container, data, key, lockOverrides, hypotheticalOver
             onToggle();
         });
     });
-
-    container.querySelectorAll('[data-cf-slot-hypothetical]').forEach((select) => {
-        select.addEventListener('change', () => {
-            const overrideKey = slotOverrideKey(select.dataset.moduleKey, Number(select.dataset.slot));
-            if (!select.value) {
-                hypotheticalOverrides.delete(overrideKey);
-            } else {
-                const [stat, value] = select.value.split(':');
-                hypotheticalOverrides.set(overrideKey, { stat, value: Number(value) });
-            }
-            onToggle();
-        });
-    });
 }
 
-function moduleContribution(module, hypotheticalOverrides) {
-    return module ? sumChronoFieldContributions(module.slots, module.key, hypotheticalOverrides) : EMPTY_CF;
-}
-
-function loadoutSubstats(data, primaryKey, assistKey, hypotheticalOverrides) {
-    const byKey = new Map(data.coreModules.map((module) => [module.key, module]));
-    const primary = moduleContribution(byKey.get(primaryKey), hypotheticalOverrides);
-    const assist = moduleContribution(byKey.get(assistKey), hypotheticalOverrides);
-    const efficiency = data.assistCoreEfficiency;
-    return {
-        duration: primary.duration + assist.duration * efficiency,
-        cooldown: primary.cooldown + assist.cooldown * efficiency,
-        speedReduction: primary.speedReduction + assist.speedReduction * efficiency,
-    };
-}
-
-function loadoutInputs(data, loadoutState, hypotheticalOverrides) {
+function loadoutInputs(data, loadoutState) {
     return {
         levels: data.levels,
-        substats: loadoutSubstats(data, loadoutState.primaryKey, loadoutState.assistKey, hypotheticalOverrides),
+        substats: computeLoadoutSubstats(data.coreModules, loadoutState.primaryKey, loadoutState.assistKey, data.assistCoreEfficiency),
         durationLabMaxed: data.durationLabMaxed,
         runPerkActive: Boolean(loadoutState.runPerkActive),
         battleConditionActive: Boolean(loadoutState.battleConditionActive),
@@ -206,13 +204,14 @@ function renderWorkspace(workspace, data) {
             `, defaultKeys)}
         </div>
         <div class="cf-planner">
-            <h3>Plan a stone investment</h3>
+            <h3>Plan your build</h3>
+            <p>Uses any slot marked Changeable to figure out what to roll there, on top of stone levels.</p>
             <form class="cf-planner-form" data-cf-planner-form>
                 <div class="cf-loadout-field">
                     <label for="cf-target-slow">Target speed reduction (%)</label>
                     <input type="number" id="cf-target-slow" min="20" max="100" step="1" value="90" data-cf-target>
                 </div>
-                <button type="submit">Find cheapest levels</button>
+                <button type="submit">Find the cheapest plan</button>
             </form>
             <div class="cf-planner-result" data-cf-planner-result aria-live="polite"></div>
         </div>
@@ -222,15 +221,13 @@ function renderWorkspace(workspace, data) {
         normal: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, runPerkActive: false },
         tournament: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, battleConditionActive: false },
     };
-    // Both shared across loadout cards: a module's locked/changeable marking
-    // and any hypothetical reroll plan are properties of the module itself,
-    // not of which card is showing it.
+    // Shared across both loadout cards: a module's locked/changeable marking
+    // is a property of the module itself, not of which card is showing it.
     const lockOverrides = new Map();
-    const hypotheticalOverrides = new Map();
 
     function recompute(id) {
         const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
-        const result = computeEffectiveChronoField(loadoutInputs(data, state[id], hypotheticalOverrides));
+        const result = computeEffectiveChronoField(loadoutInputs(data, state[id]));
         renderResult(card.querySelector('[data-cf-result]'), result);
     }
 
@@ -239,15 +236,15 @@ function renderWorkspace(workspace, data) {
         recompute('tournament');
     }
 
-    // A module's locked/changeable marking and hypothetical plan can be
-    // visible on both loadout cards at once (they can share the same
-    // module) — refresh every slot panel and both results so a change in
-    // one card stays in sync with the other.
+    // A module's locked/changeable marking can be visible on both loadout
+    // cards at once (they can share the same module) — refresh every slot
+    // panel and both results so a change in one card stays in sync with
+    // the other.
     function refreshWorkspace() {
         for (const id of ['normal', 'tournament']) {
             const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
-            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), data, state[id].primaryKey, lockOverrides, hypotheticalOverrides, refreshWorkspace);
-            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), data, state[id].assistKey, lockOverrides, hypotheticalOverrides, refreshWorkspace);
+            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), data, state[id].primaryKey, lockOverrides, refreshWorkspace);
+            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), data, state[id].assistKey, lockOverrides, refreshWorkspace);
         }
         recomputeAll();
     }
@@ -285,22 +282,30 @@ function renderWorkspace(workspace, data) {
                 return;
             }
 
-            const loadouts = ['normal', 'tournament'].map((id) => loadoutInputs(data, state[id], hypotheticalOverrides));
-            const best = findCheapestInvestment(data.levels, loadouts, target);
+            const loadoutContexts = ['normal', 'tournament'].map((id) => ({
+                primaryKey: state[id].primaryKey,
+                assistKey: state[id].assistKey,
+                durationLabMaxed: data.durationLabMaxed,
+                runPerkActive: Boolean(state[id].runPerkActive),
+                battleConditionActive: Boolean(state[id].battleConditionActive),
+            }));
 
-            if (!best) {
-                resultEl.innerHTML = '<p>No stone investment within the available levels reaches that target on both loadouts. Try a lower target.</p>';
+            const plan = findCheapestPlan({
+                currentLevels: data.levels,
+                coreModules: data.coreModules,
+                assistEfficiency: data.assistCoreEfficiency,
+                loadouts: loadoutContexts,
+                eligibleSlots: collectEligibleSlots(data, state, lockOverrides),
+                fixedOverrides: new Map(),
+                target,
+            });
+
+            if (!plan) {
+                resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
                 return;
             }
 
-            const changes = [];
-            if (best.levels.duration !== data.levels.duration) changes.push(`Duration to level ${best.levels.duration}`);
-            if (best.levels.cooldown !== data.levels.cooldown) changes.push(`Cooldown to level ${best.levels.cooldown}`);
-            if (best.levels.speed !== data.levels.speed) changes.push(`Speed Reduction to level ${best.levels.speed}`);
-
-            resultEl.innerHTML = changes.length === 0
-                ? '<p>You already meet that target on both loadouts with permanent uptime.</p>'
-                : `<p>Level up: </p><ul>${changes.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}</ul><p>${best.additionalCost.toLocaleString()} more Power Stones, keeping permanent uptime on both loadouts.</p>`;
+            resultEl.innerHTML = renderPlanHtml(plan, data.levels);
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }

@@ -37,6 +37,15 @@ const CF_SUBSTAT_OPTIONS = {
     ],
 };
 
+// Ordinal ranking, lowest first — used to prefer an easier-to-obtain rarity
+// when more than one choice would satisfy a target equally well.
+const RARITY_TIER = { Epic: 1, Legendary: 2, Mythic: 3, Ancestral: 4 };
+
+// All 10 non-empty substat choices flattened, for enumerating candidates.
+const CF_SUBSTAT_OPTION_LIST = Object.entries(CF_SUBSTAT_OPTIONS).flatMap(
+    ([stat, options]) => options.map((option) => ({ stat, ...option })),
+);
+
 function parseSignedNumber(text) {
     if (typeof text !== 'string') return null;
     const match = text.match(/-?\d+(\.\d+)?/);
@@ -66,6 +75,30 @@ function sumChronoFieldContributions(slots, moduleKey, hypotheticalOverrides) {
         if (key && value != null) totals[key] += value;
     }
     return totals;
+}
+
+const EMPTY_CONTRIBUTION = { duration: 0, cooldown: 0, speedReduction: 0 };
+
+/**
+ * A loadout's total Chrono Field substat contribution: primary module at
+ * full value, assist module scaled by `assistEfficiency` — the same
+ * weighting the game applies, per the handoff doc.
+ */
+function computeLoadoutSubstats(coreModules, primaryKey, assistKey, assistEfficiency, hypotheticalOverrides) {
+    const byKey = new Map(coreModules.map((module) => [module.key, module]));
+    const primaryModule = byKey.get(primaryKey);
+    const assistModule = byKey.get(assistKey);
+    const primary = primaryModule
+        ? sumChronoFieldContributions(primaryModule.slots, primaryModule.key, hypotheticalOverrides)
+        : EMPTY_CONTRIBUTION;
+    const assist = assistModule
+        ? sumChronoFieldContributions(assistModule.slots, assistModule.key, hypotheticalOverrides)
+        : EMPTY_CONTRIBUTION;
+    return {
+        duration: primary.duration + assist.duration * assistEfficiency,
+        cooldown: primary.cooldown + assist.cooldown * assistEfficiency,
+        speedReduction: primary.speedReduction + assist.speedReduction * assistEfficiency,
+    };
 }
 
 function parseTableValue(rawValue) {
@@ -131,10 +164,13 @@ function computeEffectiveChronoField({ levels, substats, durationLabMaxed, runPe
 module.exports = {
     LEVEL_STAT_KEYS,
     CF_SUBSTAT_OPTIONS,
+    CF_SUBSTAT_OPTION_LIST,
+    RARITY_TIER,
     maxLevel,
     levelValue,
     cumulativeCost,
     computeEffectiveChronoField,
+    computeLoadoutSubstats,
     sumChronoFieldContributions,
     slotOverrideKey,
 };
