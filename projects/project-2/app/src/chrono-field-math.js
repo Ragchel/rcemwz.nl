@@ -77,6 +77,21 @@ function sumChronoFieldContributions(slots, moduleKey, hypotheticalOverrides) {
     return totals;
 }
 
+/**
+ * Which Chrono Field stats a module already carries for real (any slot,
+ * regardless of lock state) — a module can only roll one substat of a given
+ * type at a time, so this is what the planner must avoid duplicating.
+ */
+function usedChronoFieldStats(slots) {
+    const used = new Set();
+    for (const slot of slots) {
+        if (!slot.unlocked || !slot.isChronoField) continue;
+        const stat = CF_SUBSTAT_LABELS[slot.label];
+        if (stat) used.add(stat);
+    }
+    return used;
+}
+
 const EMPTY_CONTRIBUTION = { duration: 0, cooldown: 0, speedReduction: 0 };
 
 /**
@@ -172,5 +187,6 @@ module.exports = {
     computeEffectiveChronoField,
     computeLoadoutSubstats,
     sumChronoFieldContributions,
+    usedChronoFieldStats,
     slotOverrideKey,
 };

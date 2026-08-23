@@ -3,6 +3,7 @@ const {
     cumulativeCost,
     computeEffectiveChronoField,
     computeLoadoutSubstats,
+    usedChronoFieldStats,
     CF_SUBSTAT_OPTIONS,
     CF_SUBSTAT_OPTION_LIST,
     RARITY_TIER,
@@ -75,6 +76,29 @@ function isSatisfied(results, target) {
     return results.every((result) => result.permanent && result.speedReductionEff >= target);
 }
 
+/** Per-module, which Chrono Field stats are already real on that module — a module can't roll the same substat type twice. */
+function buildUsedStatsByModule(coreModules) {
+    const map = new Map();
+    for (const module of coreModules) map.set(module.key, usedChronoFieldStats(module.slots));
+    return map;
+}
+
+/** True if `assignment` would put the same stat on the same module twice — either against a real existing one, or against itself. */
+function hasDuplicateStatPerModule(assignment, usedStatsByModule) {
+    const seenByModule = new Map();
+    for (const item of assignment) {
+        if (usedStatsByModule.get(item.moduleKey)?.has(item.stat)) return true;
+        let seen = seenByModule.get(item.moduleKey);
+        if (!seen) {
+            seen = new Set();
+            seenByModule.set(item.moduleKey, seen);
+        }
+        if (seen.has(item.stat)) return true;
+        seen.add(item.stat);
+    }
+    return false;
+}
+
 // Above this many simultaneously eligible slots, exhaustively trying every
 // combination of substat choices (11 per slot, including "leave it alone")
 // stops being fast enough for a one-click search — falls back to the greedy
@@ -94,6 +118,7 @@ function findAssignmentAtCurrentLevels(eligibleSlots, coreModules, assistEfficie
 
     const choiceCount = CF_SUBSTAT_OPTION_LIST.length + 1; // +1 for "leave alone"
     const totalCombos = choiceCount ** slotCount;
+    const usedStatsByModule = buildUsedStatsByModule(coreModules);
     let best = null;
 
     for (let combo = 0; combo < totalCombos; combo += 1) {
@@ -112,6 +137,7 @@ function findAssignmentAtCurrentLevels(eligibleSlots, coreModules, assistEfficie
             assignment.push({ ...slot, stat: option.stat, rarity: option.rarity, value: option.value });
         }
         if (assignment.length === 0) continue; // the "nothing needed" case is checked separately
+        if (hasDuplicateStatPerModule(assignment, usedStatsByModule)) continue; // can't roll the same substat twice on one module
 
         const overrides = mergeOverrides(fixedOverrides, extra);
         const results = evaluateLoadouts(loadouts, coreModules, assistEfficiency, overrides, currentLevels);
@@ -137,9 +163,12 @@ function findAssignmentAtCurrentLevels(eligibleSlots, coreModules, assistEfficie
  */
 function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loadouts, fixedOverrides, target) {
     const maxLevels = { duration: maxLevel('Duration'), cooldown: maxLevel('Cooldown'), speed: maxLevel('Speed') };
+    const usedStatsByModule = buildUsedStatsByModule(coreModules);
     const overrides = new Map();
     const assignment = [];
-    const remaining = [...eligibleSlots];
+    let remaining = [...eligibleSlots];
+
+    const canTakeStat = (slot, stat) => !usedStatsByModule.get(slot.moduleKey)?.has(stat);
 
     while (remaining.length > 0) {
         const combined = mergeOverrides(fixedOverrides, overrides);
@@ -149,12 +178,27 @@ function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loado
         const marginShort = Math.max(0, ...results.map((result) => -result.marginSeconds));
         if (speedShort <= 0 && marginShort <= 0) break;
 
-        const stat = speedShort > 0 ? 'speedReduction' : 'duration';
-        const bestOption = CF_SUBSTAT_OPTIONS[stat][CF_SUBSTAT_OPTIONS[stat].length - 1];
+        // Duration and Cooldown both close the same permanent-uptime margin —
+        // try Duration first, fall back to Cooldown if every remaining slot's
+        // module already has a Duration substat.
+        const statCandidates = speedShort > 0 ? ['speedReduction'] : ['duration', 'cooldown'];
+        let stat = null;
+        let slot = null;
+        for (const candidate of statCandidates) {
+            const match = remaining.find((entry) => canTakeStat(entry, candidate));
+            if (match) {
+                stat = candidate;
+                slot = match;
+                break;
+            }
+        }
+        if (!slot) break; // every remaining slot's module already carries this substat type — can't help further
 
-        const slot = remaining.shift();
+        const bestOption = CF_SUBSTAT_OPTIONS[stat][CF_SUBSTAT_OPTIONS[stat].length - 1];
         overrides.set(slotOverrideKey(slot.moduleKey, slot.slotNumber), { stat, value: bestOption.value });
         assignment.push({ ...slot, stat, rarity: bestOption.rarity, value: bestOption.value });
+        usedStatsByModule.get(slot.moduleKey)?.add(stat);
+        remaining = remaining.filter((entry) => entry !== slot);
     }
 
     return { overrides, assignment };
