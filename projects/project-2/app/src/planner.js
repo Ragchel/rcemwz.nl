@@ -79,7 +79,8 @@ function isSatisfied(results, target) {
 /** Per-module, which Chrono Field stats are already real on that module — a module can't roll the same substat type twice. */
 function buildUsedStatsByModule(coreModules) {
     const map = new Map();
-    for (const module of coreModules) map.set(module.key, usedChronoFieldStats(module.slots));
+    const modules = coreModules instanceof Map ? coreModules.values() : coreModules;
+    for (const module of modules) map.set(module.key, usedChronoFieldStats(module.slots));
     return map;
 }
 
@@ -214,24 +215,25 @@ function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loado
  * every eligible slot at its best rarity and maxing every stone level.
  */
 function findCheapestPlan({ currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target }) {
-    const baseline = evaluateLoadouts(loadouts, coreModules, assistEfficiency, fixedOverrides, currentLevels);
+    const modulesByKey = new Map(coreModules.map((module) => [module.key, module]));
+    const baseline = evaluateLoadouts(loadouts, modulesByKey, assistEfficiency, fixedOverrides, currentLevels);
     if (isSatisfied(baseline, target)) {
         return { levels: null, assignment: [], additionalCost: 0 };
     }
 
     const exhaustiveAssignment = findAssignmentAtCurrentLevels(
-        eligibleSlots, coreModules, assistEfficiency, loadouts, fixedOverrides, currentLevels, target,
+        eligibleSlots, modulesByKey, assistEfficiency, loadouts, fixedOverrides, currentLevels, target,
     );
     if (exhaustiveAssignment) {
         return { levels: null, assignment: exhaustiveAssignment, additionalCost: 0 };
     }
 
     const { overrides: greedyOverrides, assignment: greedyAssignment } = greedyMaxAssignment(
-        eligibleSlots, coreModules, assistEfficiency, loadouts, fixedOverrides, target,
+        eligibleSlots, modulesByKey, assistEfficiency, loadouts, fixedOverrides, target,
     );
     const combinedOverrides = mergeOverrides(fixedOverrides, greedyOverrides);
     const loadoutsForLevelSearch = loadouts.map((loadout) => ({
-        substats: computeLoadoutSubstats(coreModules, loadout.primaryKey, loadout.assistKey, assistEfficiency, combinedOverrides),
+        substats: computeLoadoutSubstats(modulesByKey, loadout.primaryKey, loadout.assistKey, assistEfficiency, combinedOverrides),
         durationLabMaxed: loadout.durationLabMaxed,
         runPerkActive: loadout.runPerkActive,
         battleConditionActive: loadout.battleConditionActive,

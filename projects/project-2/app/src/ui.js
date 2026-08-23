@@ -42,7 +42,7 @@ function isSlotLocked(module, slot, lockOverrides) {
  * as any real substat — the player has to mark one Changeable before the
  * planner will suggest anything for it.
  */
-function collectEligibleSlots(data, state, lockOverrides) {
+function collectEligibleSlots(modulesByKey, state, lockOverrides) {
     const moduleKeys = new Set([
         state.normal.primaryKey, state.normal.assistKey,
         state.tournament.primaryKey, state.tournament.assistKey,
@@ -51,7 +51,7 @@ function collectEligibleSlots(data, state, lockOverrides) {
     const eligible = [];
     for (const key of moduleKeys) {
         if (key === NONE_KEY) continue;
-        const module = data.coreModules.find((entry) => entry.key === key);
+        const module = modulesByKey.get(key);
         if (!module) continue;
 
         for (const slot of module.slots) {
@@ -121,24 +121,15 @@ function slotsHtml(module, lockOverrides) {
     return `<ul class="cf-module-slots">${items.join('')}</ul>`;
 }
 
-function renderModuleSlots(container, data, key, lockOverrides, onToggle) {
-    const module = data.coreModules.find((entry) => entry.key === key);
+function renderModuleSlots(container, modulesByKey, key, lockOverrides) {
+    const module = modulesByKey.get(key);
     container.innerHTML = slotsHtml(module, lockOverrides);
-
-    container.querySelectorAll('[data-cf-slot-toggle]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const overrideKey = slotOverrideKey(button.dataset.moduleKey, Number(button.dataset.slot));
-            const currentlyLocked = button.getAttribute('aria-pressed') === 'true';
-            lockOverrides.set(overrideKey, !currentlyLocked);
-            onToggle();
-        });
-    });
 }
 
-function loadoutInputs(data, loadoutState) {
+function loadoutInputs(data, modulesByKey, loadoutState) {
     return {
         levels: data.levels,
-        substats: computeLoadoutSubstats(data.coreModules, loadoutState.primaryKey, loadoutState.assistKey, data.assistCoreEfficiency),
+        substats: computeLoadoutSubstats(modulesByKey, loadoutState.primaryKey, loadoutState.assistKey, data.assistCoreEfficiency),
         durationLabMaxed: data.durationLabMaxed,
         runPerkActive: Boolean(loadoutState.runPerkActive),
         battleConditionActive: Boolean(loadoutState.battleConditionActive),
@@ -185,6 +176,7 @@ function loadoutCardHtml(id, title, coreModules, extraToggleHtml, defaults) {
 }
 
 function renderWorkspace(workspace, data) {
+    const modulesByKey = new Map(data.coreModules.map((module) => [module.key, module]));
     const defaultKeys = {
         primaryKey: data.defaultPrimaryKey || NONE_KEY,
         assistKey: data.defaultAssistKey || NONE_KEY,
@@ -226,10 +218,14 @@ function renderWorkspace(workspace, data) {
     // Shared across both loadout cards: a module's locked/changeable marking
     // is a property of the module itself, not of which card is showing it.
     const lockOverrides = new Map();
+    const cards = new Map(['normal', 'tournament'].map((id) => [
+        id,
+        workspace.querySelector(`[data-cf-loadout="${id}"]`),
+    ]));
 
     function recompute(id) {
-        const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
-        const result = computeEffectiveChronoField(loadoutInputs(data, state[id]));
+        const card = cards.get(id);
+        const result = computeEffectiveChronoField(loadoutInputs(data, modulesByKey, state[id]));
         renderResult(card.querySelector('[data-cf-result]'), result);
     }
 
@@ -238,21 +234,23 @@ function renderWorkspace(workspace, data) {
         recompute('tournament');
     }
 
-    // A module's locked/changeable marking can be visible on both loadout
-    // cards at once (they can share the same module) — refresh every slot
-    // panel and both results so a change in one card stays in sync with
-    // the other.
-    function refreshWorkspace() {
+    // A module can be visible in both loadouts, so redraw every slot panel
+    // whenever its locked/changeable state changes.
+    function renderAllModuleSlots() {
         for (const id of ['normal', 'tournament']) {
-            const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
-            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), data, state[id].primaryKey, lockOverrides, refreshWorkspace);
-            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), data, state[id].assistKey, lockOverrides, refreshWorkspace);
+            const card = cards.get(id);
+            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), modulesByKey, state[id].primaryKey, lockOverrides);
+            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), modulesByKey, state[id].assistKey, lockOverrides);
         }
+    }
+
+    function refreshWorkspace() {
+        renderAllModuleSlots();
         recomputeAll();
     }
 
     for (const id of ['normal', 'tournament']) {
-        const card = workspace.querySelector(`[data-cf-loadout="${id}"]`);
+        const card = cards.get(id);
         card.querySelector('[data-cf-primary]').addEventListener('change', (event) => {
             state[id].primaryKey = event.target.value;
             refreshWorkspace();
@@ -263,6 +261,16 @@ function renderWorkspace(workspace, data) {
         });
     }
     refreshWorkspace();
+
+    workspace.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-cf-slot-toggle]');
+        if (!button) return;
+
+        const overrideKey = slotOverrideKey(button.dataset.moduleKey, Number(button.dataset.slot));
+        const currentlyLocked = button.getAttribute('aria-pressed') === 'true';
+        lockOverrides.set(overrideKey, !currentlyLocked);
+        renderAllModuleSlots();
+    });
 
     workspace.querySelector('[data-cf-run-perk]').addEventListener('change', (event) => {
         state.normal.runPerkActive = event.target.checked;
@@ -297,7 +305,7 @@ function renderWorkspace(workspace, data) {
                 coreModules: data.coreModules,
                 assistEfficiency: data.assistCoreEfficiency,
                 loadouts: loadoutContexts,
-                eligibleSlots: collectEligibleSlots(data, state, lockOverrides),
+                eligibleSlots: collectEligibleSlots(modulesByKey, state, lockOverrides),
                 fixedOverrides: new Map(),
                 target,
             });

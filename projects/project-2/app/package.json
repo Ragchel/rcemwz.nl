@@ -3,7 +3,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --alias:node:zlib=./src/node-zlib-shim.js --outfile=dist/calculator.js"
+    "build": "esbuild src/main.js --bundle --minify --alias:node:zlib=./src/node-zlib-shim.js --outfile=dist/calculator.js",
+    "test": "node test/calculator.test.js"
   },
   "dependencies": {
     "pako": "^2.1.0",

@@ -1,24 +1,23 @@
 const {
     readModulesFromSaveRoot,
-    readLabsFromSaveRoot,
-    readUltimateWeaponsFromSaveRoot,
-    getUltimateWeaponSaveSlotNames,
-    decodeModuleSubstats,
-    isLabResearchMaxed,
     MODULE_SAVE_ASSIST_TYPE_TO_CATEGORY,
     MODULE_SAVE_ASSIST_SLOTS_KEY,
-} = require('thetowersdk/save');
+} = require('thetowersdk/internal/save/modules');
+const { decodeModuleSubstats } = require('thetowersdk/internal/save/module-effects-decode');
+const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 
-// From thetowersdk@0.5.3's UW_LAB_INDICES (dist/mechanics/lab-research.js).
-// Inlined instead of importing `thetowersdk/mechanics` to avoid pulling in
-// ~900KB of unrelated mechanics modules for one lookup index.
+// Stable save-array positions from thetowersdk@0.5.3. Reading these two lab
+// levels directly avoids bundling the SDK's complete lab catalog.
 const CHRONO_FIELD_DURATION_LAB_INDEX = 53;
+const CHRONO_FIELD_DURATION_LAB_MAX = 30;
+const ASSIST_CORE_SUBSTATS_LAB_INDEX = 233;
+const RESEARCH_LEVELS_KEY = 'researchLevel';
 
-const CF_SUBSTAT_LABELS = {
-    'Chrono Field - Duration': 'duration',
-    'Chrono Field - Cooldown': 'cooldown',
-    'Chrono Field - Speed Reduction': 'speedReduction',
-};
+// Chrono Field is slot 3 in the save's Ultimate Weapon arrays, with three
+// base-stat levels per slot in Duration / Speed / Cooldown order.
+const CHRONO_FIELD_SAVE_SLOT = 3;
+const UW_LEVELS_KEY = 'ultimateWeaponLevel';
+const UW_STATS_PER_SLOT = 3;
 
 const MODULE_SUBSTAT_SLOT_COUNT = 8;
 // Confirmed only for the 8th slot (player-confirmed from live gameplay, not
@@ -57,7 +56,7 @@ function decodeSlots(effects, effectLocked) {
             rarity: substat?.tier ?? null,
             displayValue: substat?.displayValue ?? null,
             locked: Boolean(effectLocked?.[index]),
-            isChronoField: Boolean(CF_SUBSTAT_LABELS[label]),
+            isChronoField: Boolean(CHRONO_FIELD_SUBSTAT_KEYS[label]),
         };
     });
 }
@@ -108,8 +107,15 @@ function findEquippedCoreKey(modulesExtract, role) {
     return item ? `equipped:${item.slotKey}` : null;
 }
 
+function numberAt(values, index) {
+    const raw = Array.isArray(values) ? values[index] : null;
+    if (raw == null) return null;
+    const value = Number(raw && typeof raw === 'object' && 'value__' in raw ? raw.value__ : raw);
+    return Number.isFinite(value) ? value : null;
+}
+
 /** Fraction (0-1) applied to an assist-slot Core module's substat contribution. */
-function readCoreAssistEfficiency(parsedRoot, labsExtract, warnings) {
+function readCoreAssistEfficiency(parsedRoot, warnings) {
     try {
         const coreSlotIndex = Object.entries(MODULE_SAVE_ASSIST_TYPE_TO_CATEGORY)
             .find(([, category]) => category === 'Core')?.[0];
@@ -119,9 +125,7 @@ function readCoreAssistEfficiency(parsedRoot, labsExtract, warnings) {
             : null;
         const stoneLevel = coreSlot?.substatEfficiencyLevel;
 
-        const labRow = (labsExtract?.researches || [])
-            .find((row) => /assist module substats/i.test(row.displayName || '') && /core/i.test(row.displayName || ''));
-        const labLevel = labRow?.level ?? 0;
+        const labLevel = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], ASSIST_CORE_SUBSTATS_LAB_INDEX) ?? 0;
 
         if (typeof stoneLevel !== 'number') {
             warnings.push('Could not read assist-module efficiency from this save — assuming 0% for assist Core substats.');
@@ -137,11 +141,11 @@ function readCoreAssistEfficiency(parsedRoot, labsExtract, warnings) {
 
 function readChronoFieldLevels(parsedRoot, warnings) {
     try {
-        const extract = readUltimateWeaponsFromSaveRoot(parsedRoot);
-        const names = getUltimateWeaponSaveSlotNames();
-        const slotIndex = names.indexOf('Chrono Field');
-        const slot = extract?.slots.find((entry) => entry.slotIndex === slotIndex);
-        const [duration, speed, cooldown] = slot?.baseStatLevels || [];
+        const levels = parsedRoot?.[UW_LEVELS_KEY];
+        const offset = CHRONO_FIELD_SAVE_SLOT * UW_STATS_PER_SLOT;
+        const duration = numberAt(levels, offset);
+        const speed = numberAt(levels, offset + 1);
+        const cooldown = numberAt(levels, offset + 2);
         if (duration == null || speed == null || cooldown == null) throw new Error('missing stat levels');
         return { duration, speed, cooldown };
     } catch {
@@ -150,11 +154,11 @@ function readChronoFieldLevels(parsedRoot, warnings) {
     }
 }
 
-function readDurationLabMaxed(parsedRoot, labsExtract, warnings) {
+function readDurationLabMaxed(parsedRoot, warnings) {
     try {
-        const row = labsExtract?.researches.find((entry) => entry.index === CHRONO_FIELD_DURATION_LAB_INDEX);
-        if (!row) throw new Error('lab row not found');
-        return isLabResearchMaxed(CHRONO_FIELD_DURATION_LAB_INDEX, row.level);
+        const level = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], CHRONO_FIELD_DURATION_LAB_INDEX);
+        if (level == null) throw new Error('lab row not found');
+        return level >= CHRONO_FIELD_DURATION_LAB_MAX;
     } catch {
         warnings.push('Could not read the Chrono Field Duration lab from this save — assuming it is not maxed.');
         return false;
@@ -170,15 +174,14 @@ function extractSaveData(parsedRoot) {
     const warnings = [];
 
     const modulesExtract = readModulesFromSaveRoot(parsedRoot);
-    const labsExtract = readLabsFromSaveRoot(parsedRoot);
 
     const stones = typeof parsedRoot?.stones === 'number' ? parsedRoot.stones : null;
 
     return {
         stones,
         levels: readChronoFieldLevels(parsedRoot, warnings),
-        durationLabMaxed: readDurationLabMaxed(parsedRoot, labsExtract, warnings),
-        assistCoreEfficiency: readCoreAssistEfficiency(parsedRoot, labsExtract, warnings),
+        durationLabMaxed: readDurationLabMaxed(parsedRoot, warnings),
+        assistCoreEfficiency: readCoreAssistEfficiency(parsedRoot, warnings),
         coreModules: collectCoreModules(modulesExtract, warnings),
         defaultPrimaryKey: findEquippedCoreKey(modulesExtract, 'primary'),
         defaultAssistKey: findEquippedCoreKey(modulesExtract, 'assist'),

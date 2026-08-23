@@ -1,16 +1,22 @@
 const { CHRONO_FIELD_STATS } = require('./chrono-field-stones');
+const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 
 const CF_STATS = CHRONO_FIELD_STATS;
 const STAT_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => [stat.name, stat]));
+const LEVEL_VALUES_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => [
+    stat.name,
+    stat.levels.map((level) => parseTableValue(level.value)),
+]));
+const CUMULATIVE_COSTS_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => {
+    let total = 0;
+    return [stat.name, stat.levels.map((level, index) => {
+        if (index > 0 && typeof level.cost === 'number') total += level.cost;
+        return total;
+    })];
+}));
 
 // Duration/Speed/Cooldown are permanent, one-way UW stone investments.
 const LEVEL_STAT_KEYS = ['Duration', 'Speed', 'Cooldown'];
-
-const CF_SUBSTAT_LABELS = {
-    'Chrono Field - Duration': 'duration',
-    'Chrono Field - Cooldown': 'cooldown',
-    'Chrono Field - Speed Reduction': 'speedReduction',
-};
 
 /**
  * Core-module substat rarity values, from the session handoff doc (verified
@@ -70,7 +76,7 @@ function sumChronoFieldContributions(slots, moduleKey, hypotheticalOverrides) {
             continue;
         }
         if (!slot.unlocked || !slot.isChronoField) continue;
-        const key = CF_SUBSTAT_LABELS[slot.label];
+        const key = CHRONO_FIELD_SUBSTAT_KEYS[slot.label];
         const value = parseSignedNumber(slot.displayValue);
         if (key && value != null) totals[key] += value;
     }
@@ -86,7 +92,7 @@ function usedChronoFieldStats(slots) {
     const used = new Set();
     for (const slot of slots) {
         if (!slot.unlocked || !slot.isChronoField) continue;
-        const stat = CF_SUBSTAT_LABELS[slot.label];
+        const stat = CHRONO_FIELD_SUBSTAT_KEYS[slot.label];
         if (stat) used.add(stat);
     }
     return used;
@@ -100,7 +106,9 @@ const EMPTY_CONTRIBUTION = { duration: 0, cooldown: 0, speedReduction: 0 };
  * weighting the game applies, per the handoff doc.
  */
 function computeLoadoutSubstats(coreModules, primaryKey, assistKey, assistEfficiency, hypotheticalOverrides) {
-    const byKey = new Map(coreModules.map((module) => [module.key, module]));
+    const byKey = coreModules instanceof Map
+        ? coreModules
+        : new Map(coreModules.map((module) => [module.key, module]));
     const primaryModule = byKey.get(primaryKey);
     const assistModule = byKey.get(assistKey);
     const primary = primaryModule
@@ -127,21 +135,16 @@ function maxLevel(statName) {
 
 /** The stat's value (seconds or %) at a given permanent stone level. */
 function levelValue(statName, level) {
-    const stat = STAT_BY_NAME[statName];
-    const clamped = Math.max(0, Math.min(level, stat.levels.length - 1));
-    return parseTableValue(stat.levels[clamped].value);
+    const values = LEVEL_VALUES_BY_NAME[statName];
+    const clamped = Math.max(0, Math.min(level, values.length - 1));
+    return values[clamped];
 }
 
 /** Cumulative stones spent to reach a level from 0. */
 function cumulativeCost(statName, level) {
-    const stat = STAT_BY_NAME[statName];
-    const clamped = Math.max(0, Math.min(level, stat.levels.length - 1));
-    let total = 0;
-    for (let i = 1; i <= clamped; i += 1) {
-        const cost = stat.levels[i].cost;
-        total += typeof cost === 'number' ? cost : 0;
-    }
-    return total;
+    const costs = CUMULATIVE_COSTS_BY_NAME[statName];
+    const clamped = Math.max(0, Math.min(level, costs.length - 1));
+    return costs[clamped];
 }
 
 /**

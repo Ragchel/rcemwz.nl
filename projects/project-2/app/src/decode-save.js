@@ -1,5 +1,6 @@
-const pako = require('pako');
-const { NRBFReader, nrbfToJSON } = require('thetowersdk/node');
+const { ungzip } = require('pako/lib/inflate.js');
+const { NRBFReader } = require('thetowersdk/internal/node/nrbf/nrbf-reader');
+const { nrbfToJSON } = require('thetowersdk/internal/node/nrbf/nrbf-to-json');
 
 /**
  * Browser-safe reimplementation of thetowersdk's decodePlayerInfoSaveBytes.
@@ -9,7 +10,7 @@ const { NRBFReader, nrbfToJSON } = require('thetowersdk/node');
  */
 function decodePlayerInfoSaveBytes(bytes) {
     const isGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
-    const inflated = isGzip ? pako.ungzip(bytes) : bytes;
+    const inflated = isGzip ? ungzip(bytes) : bytes;
     const decoded = NRBFReader.readStream(inflated);
     const parsed = nrbfToJSON(decoded);
     if (!parsed || typeof parsed !== 'object') {
