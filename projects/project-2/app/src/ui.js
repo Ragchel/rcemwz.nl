@@ -601,6 +601,13 @@ function renderWorkspace(workspace, data) {
     }
 
     workspace.querySelector('[data-cf-target]').addEventListener('input', persist);
+    workspace.querySelector('[data-cf-target]').addEventListener('change', () => {
+        // `change` (fires on blur/enter, not every keystroke) rather than
+        // `input` — the target changes what's reachable at all, so it needs
+        // a full re-plan, not just a display update, but re-running the
+        // whole search on every digit typed would be wasteful.
+        if (lastResult) runPlanner();
+    });
     workspace.querySelector('[data-cf-lab-speed]').addEventListener('change', () => {
         persist();
         // The plan itself (which slots, which stone levels) never depends on
