@@ -3,11 +3,16 @@ const { extractSaveData } = require('./extract-save-data');
 const {
     computeEffectiveChronoField,
     computeLoadoutSubstats,
+    cumulativeCost,
+    levelValue,
+    assistCoreEfficiencyCumulativeCost,
     slotOverrideKey,
 } = require('./chrono-field-math');
 const { findCheapestPlan } = require('./planner');
 
 const NONE_KEY = '__none__';
+const LOADOUT_IDS = ['farming', 'tournament'];
+const LOADOUT_LABELS = { farming: 'Farming', tournament: 'Tournament' };
 const CF_STAT_LABELS = {
     duration: 'Chrono Field Duration',
     cooldown: 'Chrono Field Cooldown',
@@ -44,7 +49,7 @@ function isSlotLocked(module, slot, lockOverrides) {
  */
 function collectEligibleSlots(modulesByKey, state, lockOverrides) {
     const moduleKeys = new Set([
-        state.normal.primaryKey, state.normal.assistKey,
+        state.farming.primaryKey, state.farming.assistKey,
         state.tournament.primaryKey, state.tournament.assistKey,
     ]);
 
@@ -62,34 +67,63 @@ function collectEligibleSlots(modulesByKey, state, lockOverrides) {
     return eligible;
 }
 
-function renderPlanHtml(plan, currentLevels) {
+function substatLineHtml(item) {
+    const sign = item.value > 0 ? '+' : '';
+    const unit = item.stat === 'speedReduction' ? '%' : 's';
+    const note = item.note ? ` (${item.note})` : '';
+    return `<li>Slot ${item.slotNumber} of ${escapeHtml(item.moduleLabel)}: roll ${CF_STAT_LABELS[item.stat]} ${sign}${item.value}${unit} (${item.rarity})${escapeHtml(note)}</li>`;
+}
+
+/**
+ * `loadoutContexts` need an `id`/`label` (e.g. "farming"/"Farming") alongside
+ * their `primaryKey`/`assistKey`, so the substat assignment — which belongs
+ * to a module, not a loadout — can be grouped by whichever loadout(s)
+ * currently use that module, sorted by module within each group. Levels and
+ * assist efficiency are account-wide, so those stay a single shared list.
+ */
+function renderPlanHtml(plan, data, loadoutContexts) {
     const parts = [];
 
     if (plan.assignment.length > 0) {
-        const items = plan.assignment.map((item) => {
-            const sign = item.value > 0 ? '+' : '';
-            const unit = item.stat === 'speedReduction' ? '%' : 's';
-            const note = item.note ? ` (${item.note})` : '';
-            return `<li>Slot ${item.slotNumber} of ${escapeHtml(item.moduleLabel)}: roll ${CF_STAT_LABELS[item.stat]} ${sign}${item.value}${unit} (${item.rarity})${escapeHtml(note)}</li>`;
-        });
-        parts.push(`<p>Get these substats:</p><ul>${items.join('')}</ul>`);
+        for (const loadout of loadoutContexts) {
+            const items = plan.assignment
+                .filter((item) => item.moduleKey === loadout.primaryKey || item.moduleKey === loadout.assistKey)
+                .slice()
+                .sort((a, b) => a.moduleLabel.localeCompare(b.moduleLabel) || a.slotNumber - b.slotNumber);
+            if (items.length === 0) continue;
+
+            parts.push(`<p>${escapeHtml(loadout.label)} — get these substats:</p><ul>${items.map(substatLineHtml).join('')}</ul>`);
+        }
     }
 
     const levelChanges = [];
     if (plan.levels) {
-        if (plan.levels.duration !== currentLevels.duration) levelChanges.push(`Duration to level ${plan.levels.duration}`);
-        if (plan.levels.cooldown !== currentLevels.cooldown) levelChanges.push(`Cooldown to level ${plan.levels.cooldown}`);
-        if (plan.levels.speed !== currentLevels.speed) levelChanges.push(`Speed Reduction to level ${plan.levels.speed}`);
+        if (plan.levels.duration !== data.levels.duration) {
+            const cost = cumulativeCost('Duration', plan.levels.duration) - cumulativeCost('Duration', data.levels.duration);
+            const seconds = levelValue('Duration', plan.levels.duration);
+            levelChanges.push(`Duration to level ${plan.levels.duration} (${seconds}s) — ${cost.toLocaleString()} stones`);
+        }
+        if (plan.levels.cooldown !== data.levels.cooldown) {
+            const cost = cumulativeCost('Cooldown', plan.levels.cooldown) - cumulativeCost('Cooldown', data.levels.cooldown);
+            const seconds = levelValue('Cooldown', plan.levels.cooldown);
+            levelChanges.push(`Cooldown to level ${plan.levels.cooldown} (${seconds}s) — ${cost.toLocaleString()} stones`);
+        }
+        if (plan.levels.speed !== data.levels.speed) {
+            const cost = cumulativeCost('Speed', plan.levels.speed) - cumulativeCost('Speed', data.levels.speed);
+            const percent = levelValue('Speed', plan.levels.speed);
+            levelChanges.push(`Speed Reduction to level ${plan.levels.speed} (${percent}%) — ${cost.toLocaleString()} stones`);
+        }
     }
     if (plan.assistEfficiencyLevel != null) {
-        levelChanges.push(`Assist Module Substats (Core) to level ${plan.assistEfficiencyLevel}`);
+        const cost = assistCoreEfficiencyCumulativeCost(data.assistCoreEfficiencyStoneLevel, plan.assistEfficiencyLevel);
+        levelChanges.push(`Assist Module Substats (Core) to level ${plan.assistEfficiencyLevel} — ${cost.toLocaleString()} stones`);
     }
     if (levelChanges.length > 0) {
         parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
     }
 
     if (plan.additionalCost > 0) {
-        parts.push(`<p>${plan.additionalCost.toLocaleString()} more Power Stones.</p>`);
+        parts.push(`<p>${plan.additionalCost.toLocaleString()} more Power Stones total.</p>`);
     }
 
     if (parts.length === 0) {
@@ -189,10 +223,10 @@ function renderWorkspace(workspace, data) {
 
     workspace.innerHTML = `
         <div class="cf-loadouts">
-            ${loadoutCardHtml('normal', 'Normal loadout', data.coreModules, `
+            ${loadoutCardHtml('farming', 'Farming loadout', data.coreModules, `
                 <div class="cf-loadout-toggle">
-                    <input type="checkbox" id="cf-normal-perk" data-cf-run-perk>
-                    <label for="cf-normal-perk">"Chrono Field Duration +5s" run perk reliably picked</label>
+                    <input type="checkbox" id="cf-farming-perk" data-cf-run-perk>
+                    <label for="cf-farming-perk">"Chrono Field Duration +5s" run perk reliably picked</label>
                 </div>
             `, defaultKeys)}
             ${loadoutCardHtml('tournament', 'Tournament loadout', data.coreModules, `
@@ -217,13 +251,13 @@ function renderWorkspace(workspace, data) {
     `;
 
     const state = {
-        normal: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, runPerkActive: false },
+        farming: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, runPerkActive: false },
         tournament: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, battleConditionActive: false },
     };
     // Shared across both loadout cards: a module's locked/changeable marking
     // is a property of the module itself, not of which card is showing it.
     const lockOverrides = new Map();
-    const cards = new Map(['normal', 'tournament'].map((id) => [
+    const cards = new Map(LOADOUT_IDS.map((id) => [
         id,
         workspace.querySelector(`[data-cf-loadout="${id}"]`),
     ]));
@@ -235,14 +269,13 @@ function renderWorkspace(workspace, data) {
     }
 
     function recomputeAll() {
-        recompute('normal');
-        recompute('tournament');
+        for (const id of LOADOUT_IDS) recompute(id);
     }
 
     // A module can be visible in both loadouts, so redraw every slot panel
     // whenever its locked/changeable state changes.
     function renderAllModuleSlots() {
-        for (const id of ['normal', 'tournament']) {
+        for (const id of LOADOUT_IDS) {
             const card = cards.get(id);
             renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), modulesByKey, state[id].primaryKey, lockOverrides);
             renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), modulesByKey, state[id].assistKey, lockOverrides);
@@ -254,7 +287,7 @@ function renderWorkspace(workspace, data) {
         recomputeAll();
     }
 
-    for (const id of ['normal', 'tournament']) {
+    for (const id of LOADOUT_IDS) {
         const card = cards.get(id);
         card.querySelector('[data-cf-primary]').addEventListener('change', (event) => {
             state[id].primaryKey = event.target.value;
@@ -278,8 +311,8 @@ function renderWorkspace(workspace, data) {
     });
 
     workspace.querySelector('[data-cf-run-perk]').addEventListener('change', (event) => {
-        state.normal.runPerkActive = event.target.checked;
-        recompute('normal');
+        state.farming.runPerkActive = event.target.checked;
+        recompute('farming');
     });
     workspace.querySelector('[data-cf-battle-condition]').addEventListener('change', (event) => {
         state.tournament.battleConditionActive = event.target.checked;
@@ -297,7 +330,9 @@ function renderWorkspace(workspace, data) {
                 return;
             }
 
-            const loadoutContexts = ['normal', 'tournament'].map((id) => ({
+            const loadoutContexts = LOADOUT_IDS.map((id) => ({
+                id,
+                label: LOADOUT_LABELS[id],
                 primaryKey: state[id].primaryKey,
                 assistKey: state[id].assistKey,
                 durationLabMaxed: data.durationLabMaxed,
@@ -321,7 +356,7 @@ function renderWorkspace(workspace, data) {
                 return;
             }
 
-            resultEl.innerHTML = renderPlanHtml(plan, data.levels);
+            resultEl.innerHTML = renderPlanHtml(plan, data, loadoutContexts);
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }
