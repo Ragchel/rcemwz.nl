@@ -3,6 +3,7 @@ const {
     cumulativeCost,
     computeEffectiveChronoField,
     computeLoadoutSubstats,
+    sumChronoFieldContributions,
     usedChronoFieldStats,
     CF_SUBSTAT_OPTIONS,
     CF_SUBSTAT_OPTION_LIST,
@@ -75,10 +76,6 @@ function evaluateLoadouts(loadouts, coreModules, assistEfficiency, overrides, le
     });
 }
 
-function isSatisfied(results, target) {
-    return results.every((result) => result.permanent && result.speedReductionEff >= target);
-}
-
 /** Per-module, which Chrono Field stats are already real on that module — a module can't roll the same substat type twice. */
 function buildUsedStatsByModule(coreModules) {
     const map = new Map();
@@ -106,19 +103,28 @@ function hasDuplicateStatPerModule(assignment, usedStatsByModule) {
 // Above this many simultaneously eligible slots, exhaustively trying every
 // combination of substat choices (11 per slot, including "leave it alone")
 // stops being fast enough for a one-click search — falls back to the greedy
-// pass below instead.
+// pass below instead. Each combo here also runs a full stone-level search
+// (see `findCheapestAssignmentAndLevels`), so when that whole thing is
+// itself being swept across ~70 assist-efficiency levels, the exhaustive
+// cap needs to be much smaller to stay fast — see `maxExhaustiveSlots` below.
 const MAX_EXHAUSTIVE_SLOTS = 5;
+const MAX_EXHAUSTIVE_SLOTS_DURING_EFFICIENCY_SWEEP = 2;
 
 /**
  * Tries every combination of "leave alone" / one of 10 Chrono Field substat
- * choices across `eligibleSlots`, at the player's *current* stone levels, and
- * returns the smallest assignment (fewest slots, then easiest rarities) that
- * satisfies every loadout — or null if none does (or there are too many
- * slots to search exhaustively).
+ * choices across `eligibleSlots`, and for each *valid* combination (no
+ * module gets the same substat twice) finds the cheapest stone-level combo
+ * on top of it — substats are free in this model, so using more of them can
+ * only ever reduce or match the stone-level cost, never raise it, which is
+ * why this searches the two together instead of picking a "just enough"
+ * substat set first and only then shopping for levels. Returns the overall
+ * cheapest `{assignment, levels, additionalCost}`, or null if either there
+ * are too many slots to search exhaustively or nothing reaches the target
+ * even at max levels with every slot used.
  */
-function findAssignmentAtCurrentLevels(eligibleSlots, coreModules, assistEfficiency, loadouts, fixedOverrides, currentLevels, target) {
+function findCheapestAssignmentAndLevels(eligibleSlots, coreModules, assistEfficiency, loadouts, fixedOverrides, currentLevels, target, maxExhaustiveSlots) {
     const slotCount = eligibleSlots.length;
-    if (slotCount === 0 || slotCount > MAX_EXHAUSTIVE_SLOTS) return null;
+    if (slotCount > maxExhaustiveSlots) return null;
 
     const choiceCount = CF_SUBSTAT_OPTION_LIST.length + 1; // +1 for "leave alone"
     const totalCombos = choiceCount ** slotCount;
@@ -140,33 +146,45 @@ function findAssignmentAtCurrentLevels(eligibleSlots, coreModules, assistEfficie
             extra.set(slotOverrideKey(slot.moduleKey, slot.slotNumber), { stat: option.stat, value: option.value });
             assignment.push({ ...slot, stat: option.stat, rarity: option.rarity, value: option.value });
         }
-        if (assignment.length === 0) continue; // the "nothing needed" case is checked separately
         if (hasDuplicateStatPerModule(assignment, usedStatsByModule)) continue; // can't roll the same substat twice on one module
 
         const overrides = mergeOverrides(fixedOverrides, extra);
-        const results = evaluateLoadouts(loadouts, coreModules, assistEfficiency, overrides, currentLevels);
-        if (!isSatisfied(results, target)) continue;
+        const loadoutsForSearch = loadouts.map((loadout) => ({
+            substats: computeLoadoutSubstats(coreModules, loadout.primaryKey, loadout.assistKey, assistEfficiency, overrides),
+            durationLabMaxed: loadout.durationLabMaxed,
+            runPerkActive: loadout.runPerkActive,
+            battleConditionActive: loadout.battleConditionActive,
+        }));
+        const levelResult = findCheapestInvestment(currentLevels, loadoutsForSearch, target);
+        if (!levelResult) continue; // this substat choice can't reach the target even at max levels
 
         const tierSum = assignment.reduce((sum, item) => sum + RARITY_TIER[item.rarity], 0);
         const isBetter = !best
-            || assignment.length < best.assignment.length
-            || (assignment.length === best.assignment.length && tierSum < best.tierSum);
-        if (isBetter) best = { assignment, tierSum };
+            || levelResult.additionalCost < best.additionalCost
+            || (levelResult.additionalCost === best.additionalCost && (
+                assignment.length < best.assignment.length
+                || (assignment.length === best.assignment.length && tierSum < best.tierSum)
+            ));
+        if (isBetter) best = { assignment, levels: levelResult.levels, additionalCost: levelResult.additionalCost, tierSum };
     }
 
-    return best ? best.assignment : null;
+    return best;
 }
 
 /**
- * Greedily assigns eligible slots to the best (Ancestral-tier) substat that
- * closes whichever gap — speed reduction, or permanent-uptime margin — is
- * currently worst across loadouts, at max stone levels. Not necessarily the
- * cheapest possible assignment (see `findAssignmentAtCurrentLevels` for
- * that), but a fast, reasonable fallback when there are too many eligible
- * slots to search exhaustively, or when levels need to grow regardless.
+ * Greedily assigns eligible slots to the best (Ancestral-tier) substat,
+ * continuing as long as doing so could still reduce the *cheapest* possible
+ * stone levels — checked at level 0, not the target/max level, since
+ * substats are free here and more of them can only lower (never raise) the
+ * stone-level cost that `findCheapestInvestment` finds afterward. Stops once
+ * every axis is already satisfied even at level 0 (more would be wasted) or
+ * no remaining slot's module can take another useful stat. Not necessarily
+ * the cheapest possible assignment (see `findCheapestAssignmentAndLevels`
+ * for that), but a fast, reasonable fallback when there are too many
+ * eligible slots to search exhaustively.
  */
 function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loadouts, fixedOverrides, target) {
-    const maxLevels = { duration: maxLevel('Duration'), cooldown: maxLevel('Cooldown'), speed: maxLevel('Speed') };
+    const minLevels = { duration: 0, cooldown: 0, speed: 0 };
     const usedStatsByModule = buildUsedStatsByModule(coreModules);
     const overrides = new Map();
     const assignment = [];
@@ -176,16 +194,16 @@ function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loado
 
     while (remaining.length > 0) {
         const combined = mergeOverrides(fixedOverrides, overrides);
-        const results = evaluateLoadouts(loadouts, coreModules, assistEfficiency, combined, maxLevels);
+        const results = evaluateLoadouts(loadouts, coreModules, assistEfficiency, combined, minLevels);
 
-        const speedShort = Math.max(0, ...results.map((result) => target - result.speedReductionEff));
-        const marginShort = Math.max(0, ...results.map((result) => -result.marginSeconds));
-        if (speedShort <= 0 && marginShort <= 0) break;
+        const speedStillHelps = results.some((result) => result.speedReductionEff < target);
+        const marginStillHelps = results.some((result) => !result.permanent);
+        if (!speedStillHelps && !marginStillHelps) break; // every axis already met at the cheapest possible level
 
-        // Duration and Cooldown both close the same permanent-uptime margin —
-        // try Duration first, fall back to Cooldown if every remaining slot's
-        // module already has a Duration substat.
-        const statCandidates = speedShort > 0 ? ['speedReduction'] : ['duration', 'cooldown'];
+        const statCandidates = [
+            ...(speedStillHelps ? ['speedReduction'] : []),
+            ...(marginStillHelps ? ['duration', 'cooldown'] : []),
+        ];
         let stat = null;
         let slot = null;
         for (const candidate of statCandidates) {
@@ -196,7 +214,7 @@ function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loado
                 break;
             }
         }
-        if (!slot) break; // every remaining slot's module already carries this substat type — can't help further
+        if (!slot) break; // every remaining slot's module already carries every stat that could still help
 
         const bestOption = CF_SUBSTAT_OPTIONS[stat][CF_SUBSTAT_OPTIONS[stat].length - 1];
         overrides.set(slotOverrideKey(slot.moduleKey, slot.slotNumber), { stat, value: bestOption.value });
@@ -218,20 +236,29 @@ function greedyMaxAssignment(eligibleSlots, coreModules, assistEfficiency, loado
  * Returns null if the target is unreachable even after using every eligible
  * slot at its best rarity and maxing every stone level.
  */
-function findCheapestPlanAtEfficiency({ currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target }) {
+function findCheapestPlanAtEfficiency({ currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target, maxExhaustiveSlots }) {
     const modulesByKey = new Map(coreModules.map((module) => [module.key, module]));
-    const baseline = evaluateLoadouts(loadouts, modulesByKey, assistEfficiency, fixedOverrides, currentLevels);
-    if (isSatisfied(baseline, target)) {
-        return { levels: null, assignment: [], additionalCost: 0 };
+
+    if (eligibleSlots.length <= maxExhaustiveSlots) {
+        const found = findCheapestAssignmentAndLevels(
+            eligibleSlots, modulesByKey, assistEfficiency, loadouts, fixedOverrides, currentLevels, target, maxExhaustiveSlots,
+        );
+        if (!found) return null;
+
+        const levelsChanged = found.levels.duration !== currentLevels.duration
+            || found.levels.cooldown !== currentLevels.cooldown
+            || found.levels.speed !== currentLevels.speed;
+
+        return {
+            levels: levelsChanged ? found.levels : null,
+            assignment: found.assignment,
+            additionalCost: found.additionalCost,
+        };
     }
 
-    const exhaustiveAssignment = findAssignmentAtCurrentLevels(
-        eligibleSlots, modulesByKey, assistEfficiency, loadouts, fixedOverrides, currentLevels, target,
-    );
-    if (exhaustiveAssignment) {
-        return { levels: null, assignment: exhaustiveAssignment, additionalCost: 0 };
-    }
-
+    // Too many eligible slots to search exhaustively — fall back to a fast
+    // greedy substat pick (not necessarily the cheapest) and search levels
+    // on top of it.
     const { overrides: greedyOverrides, assignment: greedyAssignment } = greedyMaxAssignment(
         eligibleSlots, modulesByKey, assistEfficiency, loadouts, fixedOverrides, target,
     );
@@ -258,24 +285,55 @@ function findCheapestPlanAtEfficiency({ currentLevels, coreModules, assistEffici
 }
 
 /**
+ * Whether raising assist efficiency could possibly change anything: either a
+ * loadout's assist module already carries a real Chrono Field substat (whose
+ * contribution efficiency would scale up), or one of its slots is eligible
+ * for the planner to put one there. If neither is true for any loadout,
+ * efficiency has nothing to scale and the sweep below would just be wasted
+ * work — every level would produce the identical plan.
+ */
+function assistEfficiencyCouldMatter(coreModules, loadouts, eligibleSlots) {
+    const modulesByKey = coreModules instanceof Map ? coreModules : new Map(coreModules.map((module) => [module.key, module]));
+    const assistKeys = new Set(loadouts.map((loadout) => loadout.assistKey));
+
+    for (const key of assistKeys) {
+        const module = modulesByKey.get(key);
+        if (!module) continue;
+        const contribution = sumChronoFieldContributions(module.slots, module.key, null);
+        if (contribution.duration || contribution.cooldown || contribution.speedReduction) return true;
+    }
+    return eligibleSlots.some((slot) => assistKeys.has(slot.moduleKey));
+}
+
+/**
  * The full plan, also considering whether leveling up the assist Core
  * module's substat efficiency — a separate stone investment from Duration/
  * Cooldown/Speed and from substat slots — makes the target cheaper overall.
  * A higher efficiency only ever helps (it scales the assist module's
  * contribution up), so this sweeps every stone level from the player's
  * current one to the track's cap, combining each with the cheapest
- * level/substat plan at that efficiency, and keeps the cheapest total.
+ * level/substat plan at that efficiency, and keeps the cheapest total. Skips
+ * the sweep entirely (a single pass at the current level) when the assist
+ * module has nothing for a higher efficiency to scale.
  */
 function findCheapestPlan({
     currentLevels, coreModules, assistEfficiencyStoneLevel, assistEfficiencyLabLevel,
     loadouts, eligibleSlots, fixedOverrides, target,
 }) {
+    const sweeping = assistEfficiencyCouldMatter(coreModules, loadouts, eligibleSlots);
+    const maxSweepLevel = sweeping ? ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL : assistEfficiencyStoneLevel;
+    // The exhaustive substat search below also runs a full stone-level search
+    // per combination, so when that's repeated across up to ~70 efficiency
+    // levels, it needs a much smaller slot cap to stay fast (see the two
+    // MAX_EXHAUSTIVE_SLOTS* constants) — a single pass can afford the full one.
+    const maxExhaustiveSlots = sweeping ? MAX_EXHAUSTIVE_SLOTS_DURING_EFFICIENCY_SWEEP : MAX_EXHAUSTIVE_SLOTS;
+
     let best = null;
 
-    for (let stoneLevel = assistEfficiencyStoneLevel; stoneLevel <= ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL; stoneLevel += 1) {
+    for (let stoneLevel = assistEfficiencyStoneLevel; stoneLevel <= maxSweepLevel; stoneLevel += 1) {
         const assistEfficiency = assistCoreEfficiencyFraction(stoneLevel, assistEfficiencyLabLevel);
         const innerPlan = findCheapestPlanAtEfficiency({
-            currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target,
+            currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target, maxExhaustiveSlots,
         });
         if (!innerPlan) continue;
 
