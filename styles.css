@@ -1340,9 +1340,16 @@ code {
     font-size: 1.3rem;
 }
 
-.cf-core-modules {
+.cf-loadout-body {
     display: grid;
     margin-top: 1rem;
+    grid-template-columns: 2fr 1fr;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: start;
+}
+
+.cf-core-modules {
+    display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
 }
@@ -1474,10 +1481,9 @@ code {
     letter-spacing: normal;
 }
 
-.cf-result {
-    margin-top: 1.25rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--line);
+.cf-loadout-side {
+    padding-left: clamp(1.5rem, 3vw, 2.5rem);
+    border-left: 1px solid var(--line);
 }
 
 .cf-result-status {
@@ -1529,6 +1535,12 @@ code {
 .cf-planner > p {
     margin-top: -0.5rem;
     color: var(--muted);
+}
+
+.cf-planner .cf-planner-note {
+    margin-top: 0.75rem;
+    color: var(--muted);
+    font-size: 0.8rem;
 }
 
 .cf-planner-form {
@@ -1600,6 +1612,20 @@ code {
 @keyframes drift {
     0%, 100% { transform: translate(0, 0) rotate(45deg); }
     50% { transform: translate(1.2rem, 1.8rem) rotate(115deg); }
+}
+
+@media (max-width: 900px) {
+    .cf-loadout-body {
+        grid-template-columns: 1fr;
+    }
+
+    .cf-loadout-side {
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        padding-left: 0;
+        border-top: 1px solid var(--line);
+        border-left: none;
+    }
 }
 
 @media (max-width: 760px) {

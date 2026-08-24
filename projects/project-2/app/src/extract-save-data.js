@@ -5,6 +5,12 @@ const {
 } = require('thetowersdk/internal/save/modules');
 const { decodeModuleSubstats } = require('thetowersdk/internal/save/module-effects-decode');
 const { assistEfficiency } = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
+// Deep imports instead of `thetowersdk/internal/save/relics` — that module
+// also drops in `save/workshop.js` for two generic array-coercion helpers,
+// which drags along the ~3MB workshop catalog for nothing this app uses.
+// This combination only pulls in the (much smaller) relic import catalog.
+const { buildRelicTemplateIdLookup, findRelicTemplateIdFromSaveIndex } = require('thetowersdk/internal/save/catalogs/relic-template-match');
+const { RELIC_TEMPLATES, computeLabSpeedRelicBonusPercent } = require('thetowersdk/internal/data/relics');
 const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 
 // Stable save-array positions from thetowersdk@0.5.3. Reading these two lab
@@ -12,6 +18,16 @@ const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 const CHRONO_FIELD_DURATION_LAB_INDEX = 53;
 const CHRONO_FIELD_DURATION_LAB_MAX = 30;
 const ASSIST_CORE_SUBSTATS_LAB_INDEX = 233;
+// "Labs Coin Discount" — the level feeding thetowersdk's own
+// `labCoinDiscount(level) = level * 0.003` formula, read directly so the lab
+// path's coin estimate uses the player's real discount instead of asking.
+const LABS_COIN_DISCOUNT_LAB_INDEX = 35;
+const LABS_COIN_DISCOUNT_PER_LEVEL = 0.003;
+// "Labs Speed" — the level feeding thetowersdk's `labSpeedTotal` formula
+// alongside relic bonuses, read directly for the same reason as the coin
+// discount above (so the lab path's day estimate uses the player's real
+// speed instead of asking for it).
+const LABS_SPEED_LAB_INDEX = 36;
 const RESEARCH_LEVELS_KEY = 'researchLevel';
 
 // Chrono Field is slot 3 in the save's Ultimate Weapon arrays, with three
@@ -176,6 +192,66 @@ function readDurationLabMaxed(parsedRoot, warnings) {
     }
 }
 
+function readLabsCoinDiscountFraction(parsedRoot, warnings) {
+    try {
+        const level = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], LABS_COIN_DISCOUNT_LAB_INDEX);
+        if (level == null) throw new Error('lab row not found');
+        return level * LABS_COIN_DISCOUNT_PER_LEVEL;
+    } catch {
+        warnings.push('Could not read the Labs Coin Discount lab from this save — assuming no discount.');
+        return 0;
+    }
+}
+
+function readLabsSpeedLabLevel(parsedRoot, warnings) {
+    try {
+        const level = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], LABS_SPEED_LAB_INDEX);
+        if (level == null) throw new Error('lab row not found');
+        return level;
+    } catch {
+        warnings.push('Could not read the Labs Speed lab from this save — assuming level 0.');
+        return 0;
+    }
+}
+
+const RELICS_SAVE_PROFILE_KEY = 'profileRelics';
+const RELICS_SAVE_UNLOCKED_KEY = 'relicsUnlocked';
+const RELIC_STATE_UNLOCKED_VALUE = 1;
+
+/** A `relicsUnlocked` entry can be a plain boolean or an enum-wrapped state (0 = locked, 1+ = unlocked). */
+function isRelicEntryUnlocked(raw) {
+    if (typeof raw === 'boolean') return raw;
+    const value = raw && typeof raw === 'object' && 'value__' in raw ? raw.value__ : raw;
+    return typeof value === 'number' && value >= RELIC_STATE_UNLOCKED_VALUE;
+}
+
+const RELIC_TEMPLATE_ID_LOOKUP = buildRelicTemplateIdLookup(RELIC_TEMPLATES);
+
+/** Percent lab-speed bonus from unlocked relics (e.g. "Ancient Tome" +1.5%) — the other real, save-readable source besides the Labs Speed lab. */
+function readLabSpeedRelicPercent(parsedRoot, warnings) {
+    try {
+        const unlockedIndices = new Set(
+            (Array.isArray(parsedRoot?.[RELICS_SAVE_PROFILE_KEY]) ? parsedRoot[RELICS_SAVE_PROFILE_KEY] : [])
+                .map((value) => Number(value))
+                .filter((index) => Number.isInteger(index) && index >= 0),
+        );
+        const unlockedFlags = Array.isArray(parsedRoot?.[RELICS_SAVE_UNLOCKED_KEY]) ? parsedRoot[RELICS_SAVE_UNLOCKED_KEY] : [];
+        unlockedFlags.forEach((flag, index) => {
+            if (isRelicEntryUnlocked(flag)) unlockedIndices.add(index);
+        });
+
+        const tracked = {};
+        for (const index of unlockedIndices) {
+            const templateId = findRelicTemplateIdFromSaveIndex(index, RELIC_TEMPLATES, RELIC_TEMPLATE_ID_LOOKUP);
+            if (templateId) tracked[templateId] = true;
+        }
+        return computeLabSpeedRelicBonusPercent(tracked);
+    } catch {
+        warnings.push('Could not read relic Lab Speed bonuses from this save — assuming 0%.');
+        return 0;
+    }
+}
+
 /**
  * Reads everything the calculator needs from a decoded playerInfo.dat root.
  * Best-effort: any field that can't be located degrades to a safe default
@@ -193,6 +269,9 @@ function extractSaveData(parsedRoot) {
         stones,
         levels: readChronoFieldLevels(parsedRoot, warnings),
         durationLabMaxed: readDurationLabMaxed(parsedRoot, warnings),
+        labsCoinDiscountFraction: readLabsCoinDiscountFraction(parsedRoot, warnings),
+        labsSpeedLabLevel: readLabsSpeedLabLevel(parsedRoot, warnings),
+        labSpeedRelicPercent: readLabSpeedRelicPercent(parsedRoot, warnings),
         assistCoreEfficiency: assistCoreEfficiencyInfo.fraction,
         // The stone-level side of assist efficiency — separate from the
         // fraction above because the planner can consider leveling it

@@ -35,16 +35,31 @@ function assistCoreEfficiencyCumulativeCost(fromLevel, toLevel) {
 /**
  * Coins and days of research to take the assist Core substat-efficiency
  * *lab* from one level to another — the alternative to buying stone levels.
- * Doesn't account for coin-discount or lab-speed labs (those stay out of
- * scope, same as every other lab here); returns `null` past the catalog's
- * known levels.
+ *
+ * `coinDiscountFraction` is the player's combined coin-discount total; the
+ * caller derives it from the save's own Labs Coin Discount lab, so it's
+ * reused here by solving that lab's own formula (`discount = level * 0.003`)
+ * backwards for the fraction, rather than duplicating its cost table lookup.
+ *
+ * `labSpeedLabLevel`/`labSpeedRelicPct` are the save-readable speed sources
+ * (the Labs Speed lab, and unlocked relics with a Lab Speed bonus);
+ * `speedUpMultiplier` covers anything else the save can't tell us (events,
+ * temporary boosts) and defaults to 1x. All three feed the SDK's own
+ * `labSpeedTotal` formula via `labDurationDaysToReachLevel`.
+ *
+ * Returns `null` past the catalog's known levels.
  */
-function assistCoreEfficiencyLabCumulativeCost(fromLevel, toLevel) {
+function assistCoreEfficiencyLabCumulativeCost(fromLevel, toLevel, {
+    coinDiscountFraction = 0, labSpeedLabLevel = 0, labSpeedRelicPct = 0, speedUpMultiplier = 1,
+} = {}) {
+    const coinDiscountLabLevel = coinDiscountFraction / 0.003;
     let coins = 0;
     let days = 0;
     for (let level = fromLevel + 1; level <= toLevel; level += 1) {
-        const levelCoins = labCoinCostToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level);
-        const levelDays = labDurationDaysToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level);
+        const levelCoins = labCoinCostToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level, { coinDiscountLabLevel });
+        const levelDays = labDurationDaysToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level, {
+            labSpeedLabLevel, labSpeedRelicPct, labSpeedMultiplier: speedUpMultiplier,
+        });
         if (levelCoins == null || levelDays == null) return null;
         coins += levelCoins;
         days += levelDays;

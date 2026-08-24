@@ -13,6 +13,31 @@ const {
 } = require('./chrono-field-math');
 const { findCheapestPlan, findCheapestPlanViaLab } = require('./planner');
 
+const PREFS_STORAGE_KEY = 'cf-calculator-prefs-v1';
+
+/**
+ * The player's own workspace choices (module picks, locked/changeable
+ * marks, perk/battle-condition toggles, planner inputs) — not the save
+ * itself, which can't be remembered across a reload for security reasons
+ * and has to be re-chosen each time anyway.
+ */
+function loadStoredPrefs() {
+    try {
+        const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveStoredPrefs(prefs) {
+    try {
+        localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    } catch {
+        // Private browsing / storage disabled — losing persistence is fine, the calculator still works without it.
+    }
+}
+
 const NONE_KEY = '__none__';
 const LOADOUT_IDS = ['farming', 'tournament'];
 const LOADOUT_LABELS = { farming: 'Farming', tournament: 'Tournament' };
@@ -70,7 +95,8 @@ function collectEligibleSlots(modulesByKey, state, lockOverrides) {
     return eligible;
 }
 
-const COIN_SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+// The Tower's own suffixes (lowercase/uppercase are distinct: q = quadrillion, Q = quintillion).
+const COIN_SUFFIXES = ['', 'K', 'M', 'B', 'T', 'q', 'Q', 's', 'S', 'O', 'N', 'd'];
 
 function formatCoins(value) {
     if (!Number.isFinite(value) || value <= 0) return '0';
@@ -327,20 +353,26 @@ function loadoutCardHtml(id, title, coreModules, extraToggleHtml, defaults) {
     return `
         <div class="cf-loadout" data-cf-loadout="${id}">
             <h3>${title}</h3>
-            <div class="cf-core-modules">
-                <div class="cf-loadout-field">
-                    <label for="cf-${id}-primary">Primary Core module</label>
-                    <select id="cf-${id}-primary" data-cf-primary>${moduleOptionsHtml(coreModules, defaults.primaryKey)}</select>
-                    <div class="cf-module-slots-wrap" data-cf-primary-slots></div>
+            <div class="cf-loadout-body">
+                <div class="cf-loadout-main">
+                    <div class="cf-core-modules">
+                        <div class="cf-loadout-field">
+                            <label for="cf-${id}-primary">Primary Core module</label>
+                            <select id="cf-${id}-primary" data-cf-primary>${moduleOptionsHtml(coreModules, defaults.primaryKey)}</select>
+                            <div class="cf-module-slots-wrap" data-cf-primary-slots></div>
+                        </div>
+                        <div class="cf-loadout-field">
+                            <label for="cf-${id}-assist">Assist Core module</label>
+                            <select id="cf-${id}-assist" data-cf-assist>${moduleOptionsHtml(coreModules, defaults.assistKey)}</select>
+                            <div class="cf-module-slots-wrap" data-cf-assist-slots></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="cf-loadout-field">
-                    <label for="cf-${id}-assist">Assist Core module</label>
-                    <select id="cf-${id}-assist" data-cf-assist>${moduleOptionsHtml(coreModules, defaults.assistKey)}</select>
-                    <div class="cf-module-slots-wrap" data-cf-assist-slots></div>
+                <div class="cf-loadout-side">
+                    <div class="cf-result" data-cf-result aria-live="polite"></div>
+                    ${extraToggleHtml}
                 </div>
             </div>
-            ${extraToggleHtml}
-            <div class="cf-result" data-cf-result aria-live="polite"></div>
         </div>
     `;
 }
@@ -352,20 +384,42 @@ function renderWorkspace(workspace, data) {
         assistKey: data.defaultAssistKey || NONE_KEY,
     };
 
+    // Restore the player's last workspace choices for this browser, falling
+    // back to the save's own equipped defaults for anything unset or no
+    // longer valid (e.g. a module key from an inventory that's since changed).
+    const storedPrefs = loadStoredPrefs();
+    const validKey = (key) => key === NONE_KEY || modulesByKey.has(key);
+    function resolveLoadoutDefaults(id, extraDefaults) {
+        const stored = storedPrefs?.[id];
+        const extra = {};
+        for (const [field, fallback] of Object.entries(extraDefaults)) {
+            extra[field] = stored && typeof stored[field] === 'boolean' ? stored[field] : fallback;
+        }
+        return {
+            primaryKey: stored && validKey(stored.primaryKey) ? stored.primaryKey : defaultKeys.primaryKey,
+            assistKey: stored && validKey(stored.assistKey) ? stored.assistKey : defaultKeys.assistKey,
+            ...extra,
+        };
+    }
+    const farmingInitial = resolveLoadoutDefaults('farming', { runPerkActive: true });
+    const tournamentInitial = resolveLoadoutDefaults('tournament', { battleConditionActive: true });
+    const initialTarget = Number.isFinite(storedPrefs?.target) ? storedPrefs.target : 90;
+    const initialLabSpeed = [1, 2, 3, 4, 5, 6, 7, 8].includes(storedPrefs?.labSpeedMultiplier) ? storedPrefs.labSpeedMultiplier : 1;
+
     workspace.innerHTML = `
         <div class="cf-loadouts">
             ${loadoutCardHtml('farming', 'Farming loadout', data.coreModules, `
                 <div class="cf-loadout-toggle">
-                    <input type="checkbox" id="cf-farming-perk" data-cf-run-perk>
+                    <input type="checkbox" id="cf-farming-perk" data-cf-run-perk${farmingInitial.runPerkActive ? ' checked' : ''}>
                     <label for="cf-farming-perk">"Chrono Field Duration +5s" run perk reliably picked</label>
                 </div>
-            `, defaultKeys)}
+            `, farmingInitial)}
             ${loadoutCardHtml('tournament', 'Tournament loadout', data.coreModules, `
                 <div class="cf-loadout-toggle">
-                    <input type="checkbox" id="cf-tournament-bc" data-cf-battle-condition>
+                    <input type="checkbox" id="cf-tournament-bc" data-cf-battle-condition${tournamentInitial.battleConditionActive ? ' checked' : ''}>
                     <label for="cf-tournament-bc">"Reduce Chrono Field duration by 10s" battle condition active</label>
                 </div>
-            `, defaultKeys)}
+            `, tournamentInitial)}
         </div>
         <div class="cf-planner">
             <h3>Plan your build</h3>
@@ -373,25 +427,56 @@ function renderWorkspace(workspace, data) {
             <form class="cf-planner-form" data-cf-planner-form>
                 <div class="cf-loadout-field">
                     <label for="cf-target-slow">Target speed reduction (%)</label>
-                    <input type="number" id="cf-target-slow" min="20" max="100" step="1" value="90" data-cf-target>
+                    <input type="number" id="cf-target-slow" min="20" max="100" step="1" value="${initialTarget}" data-cf-target>
+                </div>
+                <div class="cf-loadout-field">
+                    <label for="cf-lab-speed">Extra speed boost (events, etc.)</label>
+                    <select id="cf-lab-speed" data-cf-lab-speed>
+                        ${[1, 2, 3, 4, 5, 6, 7, 8].map((x) => `<option value="${x}"${x === initialLabSpeed ? ' selected' : ''}>${x}x</option>`).join('')}
+                    </select>
                 </div>
                 <button type="submit">Find the cheapest plan</button>
             </form>
+            <p class="cf-planner-note">The lab investment's coin cost and research time already account for your save's Labs Coin Discount and Labs Speed lab levels, plus any unlocked relic with a Lab Speed bonus. The extra boost above is only for anything else that can't be read from the save, like a temporary event — leave it at 1x otherwise.</p>
             <div class="cf-planner-result" data-cf-planner-result aria-live="polite"></div>
         </div>
     `;
 
     const state = {
-        farming: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, runPerkActive: false },
-        tournament: { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, battleConditionActive: false },
+        farming: { primaryKey: farmingInitial.primaryKey, assistKey: farmingInitial.assistKey, runPerkActive: farmingInitial.runPerkActive },
+        tournament: { primaryKey: tournamentInitial.primaryKey, assistKey: tournamentInitial.assistKey, battleConditionActive: tournamentInitial.battleConditionActive },
     };
     // Shared across both loadout cards: a module's locked/changeable marking
     // is a property of the module itself, not of which card is showing it.
-    const lockOverrides = new Map();
+    const lockOverrides = new Map(Array.isArray(storedPrefs?.lockOverrides) ? storedPrefs.lockOverrides : []);
     const cards = new Map(LOADOUT_IDS.map((id) => [
         id,
         workspace.querySelector(`[data-cf-loadout="${id}"]`),
     ]));
+
+    // The last plan the search produced, so the Lab speed multiplier can
+    // update its coin/day estimate live without re-running the search —
+    // that search picks the plan by stone cost alone, which speed never
+    // changes, so only the display needs to change.
+    let lastResult = null;
+
+    function renderPlanResult() {
+        if (!lastResult) return;
+        const resultEl = workspace.querySelector('[data-cf-planner-result]');
+        resultEl.innerHTML = lastResult.lead + renderPlanHtml(lastResult.plan, data, lastResult.loadoutContexts);
+    }
+
+    function persist() {
+        const targetInput = workspace.querySelector('[data-cf-target]');
+        const labSpeedSelect = workspace.querySelector('[data-cf-lab-speed]');
+        saveStoredPrefs({
+            farming: { ...state.farming },
+            tournament: { ...state.tournament },
+            lockOverrides: Array.from(lockOverrides.entries()),
+            target: Number(targetInput?.value),
+            labSpeedMultiplier: Number(labSpeedSelect?.value),
+        });
+    }
 
     function recompute(id) {
         const card = cards.get(id);
@@ -432,10 +517,12 @@ function renderWorkspace(workspace, data) {
         card.querySelector('[data-cf-primary]').addEventListener('change', (event) => {
             state[id].primaryKey = event.target.value;
             refreshWorkspace();
+            persist();
         });
         card.querySelector('[data-cf-assist]').addEventListener('change', (event) => {
             state[id].assistKey = event.target.value;
             refreshWorkspace();
+            persist();
         });
     }
     refreshWorkspace();
@@ -448,15 +535,45 @@ function renderWorkspace(workspace, data) {
         const currentlyLocked = button.getAttribute('aria-pressed') === 'true';
         lockOverrides.set(overrideKey, !currentlyLocked);
         renderAllModuleSlots();
+        persist();
     });
 
     workspace.querySelector('[data-cf-run-perk]').addEventListener('change', (event) => {
         state.farming.runPerkActive = event.target.checked;
         recompute('farming');
+        persist();
     });
     workspace.querySelector('[data-cf-battle-condition]').addEventListener('change', (event) => {
         state.tournament.battleConditionActive = event.target.checked;
         recompute('tournament');
+        persist();
+    });
+    // The save's own speed sources (Labs Speed lab level, relic bonus) plus
+    // whatever the player enters for anything else (events, ...). Kept as a
+    // function since the "extra" part can change after the plan is found.
+    function speedModifiers() {
+        return {
+            labSpeedLabLevel: data.labsSpeedLabLevel,
+            labSpeedRelicPct: data.labSpeedRelicPercent / 100,
+            speedUpMultiplier: Number(workspace.querySelector('[data-cf-lab-speed]').value) || 1,
+        };
+    }
+
+    workspace.querySelector('[data-cf-target]').addEventListener('input', persist);
+    workspace.querySelector('[data-cf-lab-speed]').addEventListener('change', () => {
+        persist();
+        // The plan itself (which slots, which stone levels) never depends on
+        // lab speed — only the lab route's day estimate does — so changing
+        // this re-derives just that number instead of re-running the search.
+        if (lastResult?.plan?.assistEfficiencyLabLevel == null) return;
+        const labCost = assistCoreEfficiencyLabCumulativeCost(
+            data.assistCoreEfficiencyLabLevel, lastResult.plan.assistEfficiencyLabLevel,
+            { coinDiscountFraction: data.labsCoinDiscountFraction, ...speedModifiers() },
+        );
+        if (!labCost) return;
+        lastResult.plan.labCoinCost = labCost.coins;
+        lastResult.plan.labDurationDays = labCost.days;
+        renderPlanResult();
     });
 
     workspace.querySelector('[data-cf-planner-form]').addEventListener('submit', (event) => {
@@ -491,16 +608,21 @@ function renderWorkspace(workspace, data) {
                 target,
             };
 
+            const coinDiscountFraction = data.labsCoinDiscountFraction;
+
             const plan = findCheapestPlan(plannerArgs);
             // Raising assist efficiency via the lab (coins + days, no stones)
             // is an alternative to buying stone levels for it — only worth
-            // taking when it actually reaches a lower stone cost.
-            const labPlan = findCheapestPlanViaLab(plannerArgs);
+            // taking when it actually reaches a lower stone cost. The coin/
+            // speed modifiers only affect the coin/day estimate, not which
+            // plan wins (that's still ranked in stones).
+            const labPlan = findCheapestPlanViaLab({ ...plannerArgs, coinDiscountFraction, ...speedModifiers() });
             const cheaper = !plan ? labPlan
                 : (labPlan && labPlan.additionalCost < plan.additionalCost) ? labPlan
                 : plan;
 
             if (!cheaper) {
+                lastResult = null;
                 resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
                 return;
             }
@@ -508,7 +630,8 @@ function renderWorkspace(workspace, data) {
             const lead = (!plan && labPlan)
                 ? '<p>Not reachable by buying stone levels alone — raising the Assist Module Substats (Core) lab gets there instead:</p>'
                 : '';
-            resultEl.innerHTML = lead + renderPlanHtml(cheaper, data, loadoutContexts);
+            lastResult = { plan: cheaper, loadoutContexts, lead };
+            renderPlanResult();
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }

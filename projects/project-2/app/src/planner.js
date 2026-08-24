@@ -372,6 +372,7 @@ function findCheapestPlan({
 function findCheapestPlanViaLab({
     currentLevels, coreModules, assistEfficiencyStoneLevel, assistEfficiencyLabLevel,
     loadouts, eligibleSlots, fixedOverrides, target,
+    coinDiscountFraction = 0, labSpeedLabLevel = 0, labSpeedRelicPct = 0, speedUpMultiplier = 1,
 }) {
     const sweeping = assistEfficiencyCouldMatter(coreModules, loadouts, eligibleSlots);
     const maxSweepLevel = sweeping ? ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL : assistEfficiencyLabLevel;
@@ -387,7 +388,9 @@ function findCheapestPlanViaLab({
         if (!innerPlan) continue;
 
         const labCost = labLevel !== assistEfficiencyLabLevel
-            ? assistCoreEfficiencyLabCumulativeCost(assistEfficiencyLabLevel, labLevel)
+            ? assistCoreEfficiencyLabCumulativeCost(assistEfficiencyLabLevel, labLevel, {
+                coinDiscountFraction, labSpeedLabLevel, labSpeedRelicPct, speedUpMultiplier,
+            })
             : { coins: 0, days: 0 };
         if (!labCost) continue; // past the lab catalog's known levels
 
