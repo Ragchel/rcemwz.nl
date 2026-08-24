@@ -272,8 +272,29 @@ function findCheapestPlanAtEfficiency({ currentLevels, coreModules, assistEffici
         battleConditionActive: loadout.battleConditionActive,
     }));
 
-    const best = findCheapestInvestment(currentLevels, loadoutsForLevelSearch, target);
-    if (!best) return null;
+    const greedyResult = findCheapestInvestment(currentLevels, loadoutsForLevelSearch, target);
+    if (!greedyResult) return null;
+
+    // Greedy adds a substat whenever it would still help at the cheapest
+    // *possible* stone levels (0) — once every assigned substat's real,
+    // non-zero contribution is known together, some can turn out not to
+    // matter (e.g. two slots covering the same stat where only one was
+    // ever needed). Drop any substat that doesn't actually raise the cost
+    // once removed, so the plan doesn't suggest rerolling for nothing.
+    const { assignment, cost } = pruneRedundantAssignment(
+        greedyAssignment, fixedOverrides, modulesByKey, assistEfficiency, loadouts, currentLevels, target, greedyResult.additionalCost,
+    );
+    const prunedOverrides = mergeOverrides(fixedOverrides, new Map(
+        assignment.map((item) => [slotOverrideKey(item.moduleKey, item.slotNumber), { stat: item.stat, value: item.value }]),
+    ));
+    const finalLoadoutsForLevelSearch = loadouts.map((loadout) => ({
+        substats: computeLoadoutSubstats(modulesByKey, loadout.primaryKey, loadout.assistKey, assistEfficiency, prunedOverrides),
+        durationLabMaxed: loadout.durationLabMaxed,
+        runPerkActive: loadout.runPerkActive,
+        battleConditionActive: loadout.battleConditionActive,
+    }));
+    const best = findCheapestInvestment(currentLevels, finalLoadoutsForLevelSearch, target);
+    if (!best) return null; // shouldn't happen — pruning never raises the cost above what was already validated
 
     const levelsChanged = best.levels.duration !== currentLevels.duration
         || best.levels.cooldown !== currentLevels.cooldown
@@ -281,9 +302,48 @@ function findCheapestPlanAtEfficiency({ currentLevels, coreModules, assistEffici
 
     return {
         levels: levelsChanged ? best.levels : null,
-        assignment: greedyAssignment,
-        additionalCost: best.additionalCost,
+        assignment,
+        additionalCost: cost,
     };
+}
+
+/**
+ * Removes substats from a greedy-produced assignment that turn out not to
+ * lower the cheapest stone-level cost once every assigned substat's real
+ * (non-zero) contribution is known together — see the comment at the call
+ * site. Tries dropping each assigned item in turn, keeps the drop whenever
+ * it doesn't raise the cost, and restarts the scan each time something is
+ * dropped (removing one substat can make another one redundant too).
+ */
+function pruneRedundantAssignment(assignment, fixedOverrides, coreModules, assistEfficiency, loadouts, currentLevels, target, baselineCost) {
+    let current = assignment;
+    let currentCost = baselineCost;
+    let changed = true;
+
+    while (changed) {
+        changed = false;
+        for (let i = 0; i < current.length; i += 1) {
+            const candidate = current.filter((_, index) => index !== i);
+            const overrides = mergeOverrides(fixedOverrides, new Map(
+                candidate.map((item) => [slotOverrideKey(item.moduleKey, item.slotNumber), { stat: item.stat, value: item.value }]),
+            ));
+            const loadoutsForSearch = loadouts.map((loadout) => ({
+                substats: computeLoadoutSubstats(coreModules, loadout.primaryKey, loadout.assistKey, assistEfficiency, overrides),
+                durationLabMaxed: loadout.durationLabMaxed,
+                runPerkActive: loadout.runPerkActive,
+                battleConditionActive: loadout.battleConditionActive,
+            }));
+            const result = findCheapestInvestment(currentLevels, loadoutsForSearch, target);
+            if (result && result.additionalCost <= currentCost) {
+                current = candidate;
+                currentCost = result.additionalCost;
+                changed = true;
+                break; // restart — the assignment changed, earlier items may now also be droppable
+            }
+        }
+    }
+
+    return { assignment: current, cost: currentCost };
 }
 
 /**
