@@ -4,8 +4,8 @@ const {
     computeEffectiveChronoField,
     computeLoadoutSubstats,
     cumulativeCost,
-    levelValue,
     assistCoreEfficiencyCumulativeCost,
+    assistCoreEfficiencyFraction,
     slotOverrideKey,
 } = require('./chrono-field-math');
 const { findCheapestPlan } = require('./planner');
@@ -75,6 +75,37 @@ function substatLineHtml(item) {
 }
 
 /**
+ * What each loadout's Duration/Cooldown/Speed Reduction actually comes out
+ * to once the whole plan is applied — the new stone levels, the suggested
+ * substats, and (if raised) the new assist efficiency — combined with that
+ * loadout's own lab/perk/battle-condition inputs. The raw stone-level table
+ * value alone isn't this: two loadouts can end up with different effective
+ * numbers from the very same level, depending on their own substats/perks.
+ */
+function finalLoadoutResultHtml(loadout, plan, data) {
+    const finalOverrides = new Map(
+        plan.assignment.map((item) => [slotOverrideKey(item.moduleKey, item.slotNumber), { stat: item.stat, value: item.value }]),
+    );
+    const finalLevels = plan.levels || data.levels;
+    const finalEfficiency = plan.assistEfficiencyLevel != null
+        ? assistCoreEfficiencyFraction(plan.assistEfficiencyLevel, data.assistCoreEfficiencyLabLevel)
+        : data.assistCoreEfficiency;
+    const substats = computeLoadoutSubstats(data.coreModules, loadout.primaryKey, loadout.assistKey, finalEfficiency, finalOverrides);
+    const result = computeEffectiveChronoField({
+        levels: finalLevels,
+        substats,
+        durationLabMaxed: loadout.durationLabMaxed,
+        runPerkActive: loadout.runPerkActive,
+        battleConditionActive: loadout.battleConditionActive,
+    });
+
+    const statusClass = result.permanent ? 'is-reached' : 'is-short';
+    const statusText = result.permanent ? 'permanent' : 'not permanent';
+    return `<p>${escapeHtml(loadout.label)} ends up at: <span class="cf-result-status ${statusClass}">${statusText}</span> — `
+        + `${result.speedReductionEff.toFixed(1)}% slow, ${result.durationEff.toFixed(1)}s duration, ${result.cooldownEff.toFixed(1)}s cooldown</p>`;
+}
+
+/**
  * `loadoutContexts` need an `id`/`label` (e.g. "farming"/"Farming") alongside
  * their `primaryKey`/`assistKey`, so the substat assignment — which belongs
  * to a module, not a loadout — can be grouped by whichever loadout(s)
@@ -84,34 +115,31 @@ function substatLineHtml(item) {
 function renderPlanHtml(plan, data, loadoutContexts) {
     const parts = [];
 
-    if (plan.assignment.length > 0) {
-        for (const loadout of loadoutContexts) {
-            const items = plan.assignment
-                .filter((item) => item.moduleKey === loadout.primaryKey || item.moduleKey === loadout.assistKey)
-                .slice()
-                .sort((a, b) => a.moduleLabel.localeCompare(b.moduleLabel) || a.slotNumber - b.slotNumber);
-            if (items.length === 0) continue;
+    for (const loadout of loadoutContexts) {
+        const items = plan.assignment
+            .filter((item) => item.moduleKey === loadout.primaryKey || item.moduleKey === loadout.assistKey)
+            .slice()
+            .sort((a, b) => a.moduleLabel.localeCompare(b.moduleLabel) || a.slotNumber - b.slotNumber);
 
-            parts.push(`<p>${escapeHtml(loadout.label)} — get these substats:</p><ul>${items.map(substatLineHtml).join('')}</ul>`);
-        }
+        const section = items.length > 0
+            ? `<p>${escapeHtml(loadout.label)} — get these substats:</p><ul>${items.map(substatLineHtml).join('')}</ul>`
+            : '';
+        parts.push(section + finalLoadoutResultHtml(loadout, plan, data));
     }
 
     const levelChanges = [];
     if (plan.levels) {
         if (plan.levels.duration !== data.levels.duration) {
             const cost = cumulativeCost('Duration', plan.levels.duration) - cumulativeCost('Duration', data.levels.duration);
-            const seconds = levelValue('Duration', plan.levels.duration);
-            levelChanges.push(`Duration to level ${plan.levels.duration} (${seconds}s) — ${cost.toLocaleString()} stones`);
+            levelChanges.push(`Duration to level ${plan.levels.duration} — ${cost.toLocaleString()} stones`);
         }
         if (plan.levels.cooldown !== data.levels.cooldown) {
             const cost = cumulativeCost('Cooldown', plan.levels.cooldown) - cumulativeCost('Cooldown', data.levels.cooldown);
-            const seconds = levelValue('Cooldown', plan.levels.cooldown);
-            levelChanges.push(`Cooldown to level ${plan.levels.cooldown} (${seconds}s) — ${cost.toLocaleString()} stones`);
+            levelChanges.push(`Cooldown to level ${plan.levels.cooldown} — ${cost.toLocaleString()} stones`);
         }
         if (plan.levels.speed !== data.levels.speed) {
             const cost = cumulativeCost('Speed', plan.levels.speed) - cumulativeCost('Speed', data.levels.speed);
-            const percent = levelValue('Speed', plan.levels.speed);
-            levelChanges.push(`Speed Reduction to level ${plan.levels.speed} (${percent}%) — ${cost.toLocaleString()} stones`);
+            levelChanges.push(`Speed Reduction to level ${plan.levels.speed} — ${cost.toLocaleString()} stones`);
         }
     }
     if (plan.assistEfficiencyLevel != null) {
@@ -122,13 +150,10 @@ function renderPlanHtml(plan, data, loadoutContexts) {
         parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
     }
 
-    if (plan.additionalCost > 0) {
-        parts.push(`<p>${plan.additionalCost.toLocaleString()} more Power Stones total.</p>`);
-    }
+    parts.push(plan.additionalCost > 0
+        ? `<p>${plan.additionalCost.toLocaleString()} more Power Stones total.</p>`
+        : '<p>You already meet that target on both loadouts with permanent uptime.</p>');
 
-    if (parts.length === 0) {
-        return '<p>You already meet that target on both loadouts with permanent uptime.</p>';
-    }
     return parts.join('');
 }
 
