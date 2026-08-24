@@ -232,10 +232,11 @@ function renderPlanHtml(plan, data, loadoutContexts) {
     const parts = [];
 
     for (const loadout of loadoutContexts) {
+        const roleRank = (item) => (item.moduleKey === loadout.primaryKey ? 0 : 1);
         const items = plan.assignment
             .filter((item) => item.moduleKey === loadout.primaryKey || item.moduleKey === loadout.assistKey)
             .slice()
-            .sort((a, b) => a.moduleLabel.localeCompare(b.moduleLabel) || a.slotNumber - b.slotNumber);
+            .sort((a, b) => roleRank(a) - roleRank(b) || a.slotNumber - b.slotNumber);
 
         const section = items.length > 0
             ? `<p>${escapeHtml(loadout.label)} — get these substats:</p><ul>${items.map(substatLineHtml).join('')}</ul>`
