@@ -9,9 +9,11 @@ const {
     CF_SUBSTAT_OPTION_LIST,
     RARITY_TIER,
     ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL,
+    ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
     slotOverrideKey,
     assistCoreEfficiencyFraction,
     assistCoreEfficiencyCumulativeCost,
+    assistCoreEfficiencyLabCumulativeCost,
 } = require('./chrono-field-math');
 
 /**
@@ -353,4 +355,63 @@ function findCheapestPlan({
     return best;
 }
 
-module.exports = { findCheapestInvestment, findCheapestPlan };
+/**
+ * Same idea as `findCheapestPlan`, but raises the assist Core module's
+ * substat-efficiency *lab* level instead of its stone level — the same slot,
+ * paid for in coins and research days instead of Power Stones. The stone
+ * level stays fixed at the player's current one throughout the sweep.
+ *
+ * Returned as a separate plan (with `assistEfficiencyLabLevel`/`labCoinCost`/
+ * `labDurationDays` instead of `assistEfficiencyLevel`) rather than blended
+ * into `findCheapestPlan`'s result, since stones and coins aren't the same
+ * currency — the caller decides whether the lab route is worth showing
+ * (typically: it reaches a lower `additionalCost` in stones than the
+ * stone-only plan, meaning the lab investment covers what would otherwise
+ * have been bought with stones).
+ */
+function findCheapestPlanViaLab({
+    currentLevels, coreModules, assistEfficiencyStoneLevel, assistEfficiencyLabLevel,
+    loadouts, eligibleSlots, fixedOverrides, target,
+}) {
+    const sweeping = assistEfficiencyCouldMatter(coreModules, loadouts, eligibleSlots);
+    const maxSweepLevel = sweeping ? ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL : assistEfficiencyLabLevel;
+    const maxExhaustiveSlots = sweeping ? MAX_EXHAUSTIVE_SLOTS_DURING_EFFICIENCY_SWEEP : MAX_EXHAUSTIVE_SLOTS;
+
+    let best = null;
+
+    for (let labLevel = assistEfficiencyLabLevel; labLevel <= maxSweepLevel; labLevel += 1) {
+        const assistEfficiency = assistCoreEfficiencyFraction(assistEfficiencyStoneLevel, labLevel);
+        const innerPlan = findCheapestPlanAtEfficiency({
+            currentLevels, coreModules, assistEfficiency, loadouts, eligibleSlots, fixedOverrides, target, maxExhaustiveSlots,
+        });
+        if (!innerPlan) continue;
+
+        const labCost = labLevel !== assistEfficiencyLabLevel
+            ? assistCoreEfficiencyLabCumulativeCost(assistEfficiencyLabLevel, labLevel)
+            : { coins: 0, days: 0 };
+        if (!labCost) continue; // past the lab catalog's known levels
+
+        // Stones are the currency this shares with the stone-only plan, so
+        // that's what ranks candidates; a smaller lab-level jump (less coin/
+        // time) breaks ties, same reasoning as preferring a lower tier substat.
+        const isBetter = !best
+            || innerPlan.additionalCost < best.additionalCost
+            || (innerPlan.additionalCost === best.additionalCost && labLevel < best.labLevel);
+
+        if (isBetter) {
+            best = {
+                levels: innerPlan.levels,
+                assignment: innerPlan.assignment,
+                labLevel,
+                assistEfficiencyLabLevel: labLevel !== assistEfficiencyLabLevel ? labLevel : null,
+                additionalCost: innerPlan.additionalCost,
+                labCoinCost: labCost.coins,
+                labDurationDays: labCost.days,
+            };
+        }
+    }
+
+    return best;
+}
+
+module.exports = { findCheapestInvestment, findCheapestPlan, findCheapestPlanViaLab };

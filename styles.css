@@ -1323,7 +1323,7 @@ code {
 
 .cf-loadouts {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: clamp(1.5rem, 4vw, 2.5rem);
 }
 
@@ -1340,9 +1340,23 @@ code {
     font-size: 1.3rem;
 }
 
+.cf-core-modules {
+    display: grid;
+    margin-top: 1rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
 .cf-loadout-field {
     display: block;
+}
+
+.cf-loadout-field + .cf-loadout-field {
     margin-top: 1rem;
+}
+
+.cf-core-modules .cf-loadout-field + .cf-loadout-field {
+    margin-top: 0;
 }
 
 .cf-loadout-field label {
@@ -1561,6 +1575,34 @@ code {
     padding-left: 1.2rem;
 }
 
+.cf-breakdown {
+    margin-top: 0.6rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.cf-breakdown summary {
+    cursor: pointer;
+}
+
+.cf-breakdown ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.2rem;
+}
+
+.cf-plan-alt {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+}
+
+.cf-plan-alt h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+}
+
 .cf-message {
     padding: 1rem;
     color: var(--ink);
@@ -1726,7 +1768,7 @@ code {
         margin: 0;
     }
 
-    .cf-loadouts {
+    .cf-core-modules {
         grid-template-columns: 1fr;
     }
 

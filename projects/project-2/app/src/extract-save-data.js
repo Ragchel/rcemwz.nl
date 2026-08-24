@@ -62,10 +62,14 @@ function decodeSlots(effects, effectLocked) {
     });
 }
 
-function friendlyModuleLabel(rarityLabel, mappedName, note) {
+function friendlyModuleLabel(rarityLabel, mappedName, note, level) {
     const rarity = rarityLabel || 'Unknown rarity';
     const name = mappedName || 'Core module';
-    return `${rarity} ${name} (${note})`;
+    // Level is included so two owned copies of the same rarity+name — e.g.
+    // a farm-dedicated and a tournament-dedicated Dimension Core — read as
+    // distinct entries instead of identical-looking duplicates.
+    const levelPart = typeof level === 'number' ? ` L${level}` : '';
+    return `${rarity} ${name}${levelPart} (${note})`;
 }
 
 function collectCoreModules(modulesExtract, warnings) {
@@ -80,7 +84,7 @@ function collectCoreModules(modulesExtract, warnings) {
         const slots = decodeSlots(item.effects, item.effectLocked);
         owned.push({
             key: `equipped:${item.slotKey}`,
-            label: friendlyModuleLabel(item.rarityLabel, item.mappedName, `equipped, ${item.role === 'primary' ? 'Primary' : 'Assist'}`),
+            label: friendlyModuleLabel(item.rarityLabel, item.mappedName, `equipped, ${item.role === 'primary' ? 'Primary' : 'Assist'}`, item.level),
             role: item.role,
             level: item.level,
             slots,
@@ -92,7 +96,7 @@ function collectCoreModules(modulesExtract, warnings) {
         const slots = decodeSlots(item.effects, item.effectLocked);
         owned.push({
             key: `inventory:${item.recordIndex ?? index}`,
-            label: friendlyModuleLabel(item.rarityLabel, item.mappedName, 'inventory'),
+            label: friendlyModuleLabel(item.rarityLabel, item.mappedName, 'inventory', item.level),
             role: null,
             level: item.level,
             slots,

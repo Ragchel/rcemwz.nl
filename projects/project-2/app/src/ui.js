@@ -3,12 +3,15 @@ const { extractSaveData } = require('./extract-save-data');
 const {
     computeEffectiveChronoField,
     computeLoadoutSubstats,
+    computeLoadoutSubstatsBreakdown,
     cumulativeCost,
+    levelValue,
     assistCoreEfficiencyCumulativeCost,
     assistCoreEfficiencyFraction,
+    assistCoreEfficiencyLabCumulativeCost,
     slotOverrideKey,
 } = require('./chrono-field-math');
-const { findCheapestPlan } = require('./planner');
+const { findCheapestPlan, findCheapestPlanViaLab } = require('./planner');
 
 const NONE_KEY = '__none__';
 const LOADOUT_IDS = ['farming', 'tournament'];
@@ -67,6 +70,82 @@ function collectEligibleSlots(modulesByKey, state, lockOverrides) {
     return eligible;
 }
 
+const COIN_SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+
+function formatCoins(value) {
+    if (!Number.isFinite(value) || value <= 0) return '0';
+    const tier = Math.max(0, Math.min(COIN_SUFFIXES.length - 1, Math.floor(Math.log10(value) / 3)));
+    const scaled = value / 10 ** (tier * 3);
+    const digits = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
+    return `${scaled.toFixed(digits)}${COIN_SUFFIXES[tier]}`;
+}
+
+function formatResearchDays(days) {
+    const totalMinutes = Math.round(days * 24 * 60);
+    const wholeDays = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const minutes = totalMinutes % 60;
+    if (wholeDays > 0) return `${wholeDays}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+}
+
+/**
+ * Renders one Duration/Cooldown/Speed Reduction figure as the sum of terms
+ * that produced it (level table value, lab/perk/battle-condition, primary
+ * and assist substats), skipping any term that's zero. `terms[0]` sets the
+ * line's sign convention; later terms show their own sign.
+ */
+function sourceLineHtml(label, unit, terms) {
+    const nonZero = terms.filter((term) => term.value !== 0);
+    if (nonZero.length === 0) nonZero.push(terms[0]);
+    const pieces = nonZero.map((term, index) => {
+        const magnitude = `${Math.abs(term.value).toFixed(1)}${unit}`;
+        if (index === 0) return `${term.value < 0 ? '−' : ''}${magnitude} (${escapeHtml(term.text)})`;
+        return ` ${term.value >= 0 ? '+' : '−'} ${magnitude} (${escapeHtml(term.text)})`;
+    });
+    return `<li>${escapeHtml(label)}: ${pieces.join('')}</li>`;
+}
+
+/**
+ * A collapsible "where these numbers come from" breakdown for one loadout's
+ * final Duration/Cooldown/Speed Reduction — the aggregate figures alone
+ * don't show how much came from stone levels vs. labs/perks vs. substats,
+ * which two loadouts can split differently even at the same stone levels.
+ */
+function breakdownDetailsHtml({ levels, efficiency, breakdown, durationLabMaxed, runPerkActive, battleConditionActive }) {
+    const assistLabel = `assist module substat, ×${Math.round(efficiency * 100)}%`;
+
+    const durationTerms = [
+        { text: `Duration level ${levels.duration}`, value: levelValue('Duration', levels.duration) },
+        { text: 'Duration lab maxed', value: durationLabMaxed ? 30 : 0 },
+        { text: 'run perk', value: runPerkActive ? 5 : 0 },
+        { text: 'battle condition', value: battleConditionActive ? -10 : 0 },
+        { text: 'primary module substat', value: breakdown.primary.duration },
+        { text: assistLabel, value: breakdown.assist.duration * efficiency },
+    ];
+    const cooldownTerms = [
+        { text: `Cooldown level ${levels.cooldown}`, value: levelValue('Cooldown', levels.cooldown) },
+        { text: 'primary module substat', value: breakdown.primary.cooldown },
+        { text: assistLabel, value: breakdown.assist.cooldown * efficiency },
+    ];
+    const speedTerms = [
+        { text: `Speed level ${levels.speed}`, value: levelValue('Speed', levels.speed) },
+        { text: 'primary module substat', value: breakdown.primary.speedReduction },
+        { text: assistLabel, value: breakdown.assist.speedReduction * efficiency },
+    ];
+
+    return `
+        <details class="cf-breakdown">
+            <summary>Where these numbers come from</summary>
+            <ul>
+                ${sourceLineHtml('Duration', 's', durationTerms)}
+                ${sourceLineHtml('Cooldown', 's', cooldownTerms)}
+                ${sourceLineHtml('Speed reduction', '%', speedTerms)}
+            </ul>
+        </details>`;
+}
+
 function substatLineHtml(item) {
     const sign = item.value > 0 ? '+' : '';
     const unit = item.stat === 'speedReduction' ? '%' : 's';
@@ -87,9 +166,12 @@ function finalLoadoutResultHtml(loadout, plan, data) {
         plan.assignment.map((item) => [slotOverrideKey(item.moduleKey, item.slotNumber), { stat: item.stat, value: item.value }]),
     );
     const finalLevels = plan.levels || data.levels;
-    const finalEfficiency = plan.assistEfficiencyLevel != null
-        ? assistCoreEfficiencyFraction(plan.assistEfficiencyLevel, data.assistCoreEfficiencyLabLevel)
+    const finalStoneLevel = plan.assistEfficiencyLevel ?? data.assistCoreEfficiencyStoneLevel;
+    const finalLabLevel = plan.assistEfficiencyLabLevel ?? data.assistCoreEfficiencyLabLevel;
+    const finalEfficiency = (plan.assistEfficiencyLevel != null || plan.assistEfficiencyLabLevel != null)
+        ? assistCoreEfficiencyFraction(finalStoneLevel, finalLabLevel)
         : data.assistCoreEfficiency;
+    const breakdown = computeLoadoutSubstatsBreakdown(data.coreModules, loadout.primaryKey, loadout.assistKey, finalOverrides);
     const substats = computeLoadoutSubstats(data.coreModules, loadout.primaryKey, loadout.assistKey, finalEfficiency, finalOverrides);
     const result = computeEffectiveChronoField({
         levels: finalLevels,
@@ -102,7 +184,15 @@ function finalLoadoutResultHtml(loadout, plan, data) {
     const statusClass = result.permanent ? 'is-reached' : 'is-short';
     const statusText = result.permanent ? 'permanent' : 'not permanent';
     return `<p>${escapeHtml(loadout.label)} ends up at: <span class="cf-result-status ${statusClass}">${statusText}</span> — `
-        + `${result.speedReductionEff.toFixed(1)}% slow, ${result.durationEff.toFixed(1)}s duration, ${result.cooldownEff.toFixed(1)}s cooldown</p>`;
+        + `${result.speedReductionEff.toFixed(1)}% slow, ${result.durationEff.toFixed(1)}s duration, ${result.cooldownEff.toFixed(1)}s cooldown</p>`
+        + breakdownDetailsHtml({
+            levels: finalLevels,
+            efficiency: finalEfficiency,
+            breakdown,
+            durationLabMaxed: loadout.durationLabMaxed,
+            runPerkActive: loadout.runPerkActive,
+            battleConditionActive: loadout.battleConditionActive,
+        });
 }
 
 /**
@@ -146,15 +236,28 @@ function renderPlanHtml(plan, data, loadoutContexts) {
         const cost = assistCoreEfficiencyCumulativeCost(data.assistCoreEfficiencyStoneLevel, plan.assistEfficiencyLevel);
         levelChanges.push(`Assist Module Substats (Core) to level ${plan.assistEfficiencyLevel} — ${cost.toLocaleString()} stones`);
     }
+    if (plan.assistEfficiencyLabLevel != null) {
+        levelChanges.push(`Assist Module Substats (Core) lab to level ${plan.assistEfficiencyLabLevel} — `
+            + `${formatCoins(plan.labCoinCost)} coins, ${formatResearchDays(plan.labDurationDays)} of research (no stones)`);
+    }
     if (levelChanges.length > 0) {
         parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
     }
 
-    parts.push(plan.additionalCost > 0
-        ? `<p>${plan.additionalCost.toLocaleString()} more Power Stones total.</p>`
-        : '<p>You already meet that target on both loadouts with permanent uptime.</p>');
+    parts.push(planCostSummaryHtml(plan));
 
     return parts.join('');
+}
+
+/** The plan's total cost line — mentions coins/research days too when the plan raises assist efficiency via the lab instead of stones. */
+function planCostSummaryHtml(plan) {
+    const pieces = [];
+    if (plan.additionalCost > 0) pieces.push(`${plan.additionalCost.toLocaleString()} Power Stones`);
+    if (plan.assistEfficiencyLabLevel != null) {
+        pieces.push(`${formatCoins(plan.labCoinCost)} coins`, `${formatResearchDays(plan.labDurationDays)} of research`);
+    }
+    if (pieces.length === 0) return '<p>You already meet that target on both loadouts with permanent uptime.</p>';
+    return `<p>${pieces.join(' + ')} total.</p>`;
 }
 
 function slotsHtml(module, lockOverrides) {
@@ -204,7 +307,7 @@ function formatSeconds(value) {
     return `${value.toFixed(1)}s`;
 }
 
-function renderResult(container, result) {
+function renderResult(container, result, breakdownArgs) {
     const statusClass = result.permanent ? 'is-reached' : 'is-short';
     const statusText = result.permanent ? 'Permanent uptime reached' : 'Not permanent yet';
     const marginLabel = result.permanent ? 'Margin to spare' : 'Still short by';
@@ -216,6 +319,7 @@ function renderResult(container, result) {
             <dt>Cooldown</dt><dd>${formatSeconds(result.cooldownEff)}</dd>
             <dt>${marginLabel}</dt><dd>${formatSeconds(Math.abs(result.marginSeconds))}</dd>
         </dl>
+        ${breakdownDetailsHtml(breakdownArgs)}
     `;
 }
 
@@ -223,15 +327,17 @@ function loadoutCardHtml(id, title, coreModules, extraToggleHtml, defaults) {
     return `
         <div class="cf-loadout" data-cf-loadout="${id}">
             <h3>${title}</h3>
-            <div class="cf-loadout-field">
-                <label for="cf-${id}-primary">Primary Core module</label>
-                <select id="cf-${id}-primary" data-cf-primary>${moduleOptionsHtml(coreModules, defaults.primaryKey)}</select>
-                <div class="cf-module-slots-wrap" data-cf-primary-slots></div>
-            </div>
-            <div class="cf-loadout-field">
-                <label for="cf-${id}-assist">Assist Core module</label>
-                <select id="cf-${id}-assist" data-cf-assist>${moduleOptionsHtml(coreModules, defaults.assistKey)}</select>
-                <div class="cf-module-slots-wrap" data-cf-assist-slots></div>
+            <div class="cf-core-modules">
+                <div class="cf-loadout-field">
+                    <label for="cf-${id}-primary">Primary Core module</label>
+                    <select id="cf-${id}-primary" data-cf-primary>${moduleOptionsHtml(coreModules, defaults.primaryKey)}</select>
+                    <div class="cf-module-slots-wrap" data-cf-primary-slots></div>
+                </div>
+                <div class="cf-loadout-field">
+                    <label for="cf-${id}-assist">Assist Core module</label>
+                    <select id="cf-${id}-assist" data-cf-assist>${moduleOptionsHtml(coreModules, defaults.assistKey)}</select>
+                    <div class="cf-module-slots-wrap" data-cf-assist-slots></div>
+                </div>
             </div>
             ${extraToggleHtml}
             <div class="cf-result" data-cf-result aria-live="polite"></div>
@@ -289,8 +395,17 @@ function renderWorkspace(workspace, data) {
 
     function recompute(id) {
         const card = cards.get(id);
-        const result = computeEffectiveChronoField(loadoutInputs(data, modulesByKey, state[id]));
-        renderResult(card.querySelector('[data-cf-result]'), result);
+        const inputs = loadoutInputs(data, modulesByKey, state[id]);
+        const result = computeEffectiveChronoField(inputs);
+        const breakdown = computeLoadoutSubstatsBreakdown(modulesByKey, state[id].primaryKey, state[id].assistKey);
+        renderResult(card.querySelector('[data-cf-result]'), result, {
+            levels: data.levels,
+            efficiency: data.assistCoreEfficiency,
+            breakdown,
+            durationLabMaxed: data.durationLabMaxed,
+            runPerkActive: inputs.runPerkActive,
+            battleConditionActive: inputs.battleConditionActive,
+        });
     }
 
     function recomputeAll() {
@@ -365,7 +480,7 @@ function renderWorkspace(workspace, data) {
                 battleConditionActive: Boolean(state[id].battleConditionActive),
             }));
 
-            const plan = findCheapestPlan({
+            const plannerArgs = {
                 currentLevels: data.levels,
                 coreModules: data.coreModules,
                 assistEfficiencyStoneLevel: data.assistCoreEfficiencyStoneLevel,
@@ -374,14 +489,34 @@ function renderWorkspace(workspace, data) {
                 eligibleSlots: collectEligibleSlots(modulesByKey, state, lockOverrides),
                 fixedOverrides: new Map(),
                 target,
-            });
+            };
+
+            const plan = findCheapestPlan(plannerArgs);
 
             if (!plan) {
-                resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
+                // Stones alone can't reach the target — see whether raising
+                // assist efficiency via the lab (a lower ceiling than stones,
+                // since the stone level stays fixed here) rescues it anyway.
+                const labRescue = findCheapestPlanViaLab(plannerArgs);
+                resultEl.innerHTML = labRescue
+                    ? `<p>Not reachable by buying stone levels alone — but raising the Assist Module Substats (Core) lab gets there instead:</p>${renderPlanHtml(labRescue, data, loadoutContexts)}`
+                    : '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
                 return;
             }
 
-            resultEl.innerHTML = renderPlanHtml(plan, data, loadoutContexts);
+            let html = renderPlanHtml(plan, data, loadoutContexts);
+
+            // Only worth mentioning when it actually saves stones — otherwise
+            // the lab route just spends coins/time for nothing extra.
+            const labAlt = findCheapestPlanViaLab(plannerArgs);
+            if (labAlt && labAlt.additionalCost < plan.additionalCost) {
+                html += `<div class="cf-plan-alt">
+                    <h4>Cheaper option: raise Substat Efficiency via the lab instead of stones</h4>
+                    ${renderPlanHtml(labAlt, data, loadoutContexts)}
+                </div>`;
+            }
+
+            resultEl.innerHTML = html;
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }

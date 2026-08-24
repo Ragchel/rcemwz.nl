@@ -5,10 +5,23 @@ const {
     cumulativeAssistEfficiencyStoneCost,
     maxStoneLevel: assistEfficiencyMaxStoneLevel,
 } = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
+const {
+    labCoinCostToReachLevel,
+    labDurationDaysToReachLevel,
+    labMaxCatalogLevel,
+} = require('thetowersdk/internal/mechanics/effective-paths-lab-costs');
 
 // Only the "substat" efficiency track matters here — Chrono Field's
 // contributions are all substats, never the "multiplier" track.
 const ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL = assistEfficiencyMaxStoneLevel('substat');
+
+// The same assist-efficiency slot can also be raised by researching this lab
+// instead of buying stone levels — a coins-and-time path rather than a
+// stones one. Catalog slug confirmed against thetowersdk's
+// `LAB_RESEARCH_BY_INDEX[233]` ("Assist Module Substats - Core"), the same
+// save index `extract-save-data.js` reads the lab level from.
+const ASSIST_CORE_EFFICIENCY_LAB_SLUG = 'assist_module_substats_core';
+const ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL = labMaxCatalogLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG);
 
 function assistCoreEfficiencyFraction(stoneLevel, labLevel) {
     return Math.max(0, Math.min(1, computeAssistEfficiencyFraction({ hasAssist: true, stoneLevel, labLevel })));
@@ -17,6 +30,26 @@ function assistCoreEfficiencyFraction(stoneLevel, labLevel) {
 /** Stones to take the assist Core substat-efficiency slot from one level to another. */
 function assistCoreEfficiencyCumulativeCost(fromLevel, toLevel) {
     return cumulativeAssistEfficiencyStoneCost('substat', fromLevel, toLevel);
+}
+
+/**
+ * Coins and days of research to take the assist Core substat-efficiency
+ * *lab* from one level to another — the alternative to buying stone levels.
+ * Doesn't account for coin-discount or lab-speed labs (those stay out of
+ * scope, same as every other lab here); returns `null` past the catalog's
+ * known levels.
+ */
+function assistCoreEfficiencyLabCumulativeCost(fromLevel, toLevel) {
+    let coins = 0;
+    let days = 0;
+    for (let level = fromLevel + 1; level <= toLevel; level += 1) {
+        const levelCoins = labCoinCostToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level);
+        const levelDays = labDurationDaysToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level);
+        if (levelCoins == null || levelDays == null) return null;
+        coins += levelCoins;
+        days += levelDays;
+    }
+    return { coins, days };
 }
 
 const CF_STATS = CHRONO_FIELD_STATS;
@@ -119,22 +152,34 @@ function usedChronoFieldStats(slots) {
 const EMPTY_CONTRIBUTION = { duration: 0, cooldown: 0, speedReduction: 0 };
 
 /**
- * A loadout's total Chrono Field substat contribution: primary module at
- * full value, assist module scaled by `assistEfficiency` — the same
- * weighting the game applies, per the handoff doc.
+ * A loadout's Chrono Field substat contribution, kept as separate primary/
+ * assist totals rather than merged — so a caller can show *where* the final
+ * number comes from (e.g. "assist module substat, scaled 34%") instead of
+ * just the combined result.
  */
-function computeLoadoutSubstats(coreModules, primaryKey, assistKey, assistEfficiency, hypotheticalOverrides) {
+function computeLoadoutSubstatsBreakdown(coreModules, primaryKey, assistKey, hypotheticalOverrides) {
     const byKey = coreModules instanceof Map
         ? coreModules
         : new Map(coreModules.map((module) => [module.key, module]));
     const primaryModule = byKey.get(primaryKey);
     const assistModule = byKey.get(assistKey);
-    const primary = primaryModule
-        ? sumChronoFieldContributions(primaryModule.slots, primaryModule.key, hypotheticalOverrides)
-        : EMPTY_CONTRIBUTION;
-    const assist = assistModule
-        ? sumChronoFieldContributions(assistModule.slots, assistModule.key, hypotheticalOverrides)
-        : EMPTY_CONTRIBUTION;
+    return {
+        primary: primaryModule
+            ? sumChronoFieldContributions(primaryModule.slots, primaryModule.key, hypotheticalOverrides)
+            : EMPTY_CONTRIBUTION,
+        assist: assistModule
+            ? sumChronoFieldContributions(assistModule.slots, assistModule.key, hypotheticalOverrides)
+            : EMPTY_CONTRIBUTION,
+    };
+}
+
+/**
+ * A loadout's total Chrono Field substat contribution: primary module at
+ * full value, assist module scaled by `assistEfficiency` — the same
+ * weighting the game applies, per the handoff doc.
+ */
+function computeLoadoutSubstats(coreModules, primaryKey, assistKey, assistEfficiency, hypotheticalOverrides) {
+    const { primary, assist } = computeLoadoutSubstatsBreakdown(coreModules, primaryKey, assistKey, hypotheticalOverrides);
     return {
         duration: primary.duration + assist.duration * assistEfficiency,
         cooldown: primary.cooldown + assist.cooldown * assistEfficiency,
@@ -203,14 +248,17 @@ module.exports = {
     CF_SUBSTAT_OPTION_LIST,
     RARITY_TIER,
     ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL,
+    ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
     maxLevel,
     levelValue,
     cumulativeCost,
     computeEffectiveChronoField,
     computeLoadoutSubstats,
+    computeLoadoutSubstatsBreakdown,
     sumChronoFieldContributions,
     usedChronoFieldStats,
     slotOverrideKey,
     assistCoreEfficiencyFraction,
     assistCoreEfficiencyCumulativeCost,
+    assistCoreEfficiencyLabCumulativeCost,
 };
