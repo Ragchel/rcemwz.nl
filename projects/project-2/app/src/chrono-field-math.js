@@ -83,6 +83,10 @@ function durationLabCumulativeCost(fromLevel, toLevel, modifiers) {
     return labCumulativeCost(CHRONO_FIELD_DURATION_LAB_SLUG, fromLevel, toLevel, modifiers);
 }
 
+// The game's own hard ceiling on effective Chrono Field Speed Reduction,
+// regardless of stone level + substats.
+const SPEED_REDUCTION_CAP_PERCENT = 90;
+
 const CF_STATS = CHRONO_FIELD_STATS;
 const STAT_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => [stat.name, stat]));
 const LEVEL_VALUES_BY_NAME = Object.fromEntries(CF_STATS.map((stat) => [
@@ -262,7 +266,9 @@ function computeEffectiveChronoField({ levels, substats, durationLabMaxed, runPe
         - (battleConditionActive ? 10 : 0);
 
     const cooldownEff = cooldownLevelValue + substats.cooldown;
-    const speedReductionEff = speedLevelValue + substats.speedReduction;
+    // The game itself hard-caps effective Speed Reduction at 90%, no matter
+    // how much stone level + substats add up to past that.
+    const speedReductionEff = Math.min(SPEED_REDUCTION_CAP_PERCENT, speedLevelValue + substats.speedReduction);
 
     return {
         durationEff,
@@ -281,6 +287,7 @@ module.exports = {
     ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL,
     ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
     CHRONO_FIELD_DURATION_LAB_MAX_LEVEL,
+    SPEED_REDUCTION_CAP_PERCENT,
     maxLevel,
     levelValue,
     cumulativeCost,

@@ -12,6 +12,7 @@ const {
     durationLabCumulativeCost,
     ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
     CHRONO_FIELD_DURATION_LAB_MAX_LEVEL,
+    SPEED_REDUCTION_CAP_PERCENT,
     slotOverrideKey,
 } = require('./chrono-field-math');
 const { findCheapestPlan, findCheapestPlanViaLab } = require('./planner');
@@ -125,7 +126,7 @@ function formatResearchDays(days) {
  * and assist substats), skipping any term that's zero. `terms[0]` sets the
  * line's sign convention; later terms show their own sign.
  */
-function sourceLineHtml(label, unit, terms) {
+function sourceLineHtml(label, unit, terms, cap) {
     const nonZero = terms.filter((term) => term.value !== 0);
     if (nonZero.length === 0) nonZero.push(terms[0]);
     const pieces = nonZero.map((term, index) => {
@@ -133,7 +134,9 @@ function sourceLineHtml(label, unit, terms) {
         if (index === 0) return `${term.value < 0 ? '−' : ''}${magnitude} (${escapeHtml(term.text)})`;
         return ` ${term.value >= 0 ? '+' : '−'} ${magnitude} (${escapeHtml(term.text)})`;
     });
-    return `<li>${escapeHtml(label)}: ${pieces.join('')}</li>`;
+    const rawTotal = terms.reduce((sum, term) => sum + term.value, 0);
+    const cappedNote = cap != null && rawTotal > cap ? ` — capped at ${cap}${unit}` : '';
+    return `<li>${escapeHtml(label)}: ${pieces.join('')}${cappedNote}</li>`;
 }
 
 /**
@@ -170,7 +173,7 @@ function breakdownDetailsHtml({ levels, efficiency, breakdown, durationLabMaxed,
             <ul>
                 ${sourceLineHtml('Duration', 's', durationTerms)}
                 ${sourceLineHtml('Cooldown', 's', cooldownTerms)}
-                ${sourceLineHtml('Speed reduction', '%', speedTerms)}
+                ${sourceLineHtml('Speed reduction', '%', speedTerms, SPEED_REDUCTION_CAP_PERCENT)}
             </ul>
         </details>`;
 }
@@ -428,7 +431,9 @@ function renderWorkspace(workspace, data) {
     }
     const farmingInitial = resolveLoadoutDefaults('farming', { runPerkActive: true });
     const tournamentInitial = resolveLoadoutDefaults('tournament', { battleConditionActive: true });
-    const initialTarget = Number.isFinite(storedPrefs?.target) ? storedPrefs.target : 90;
+    const initialTarget = Number.isFinite(storedPrefs?.target)
+        ? Math.min(SPEED_REDUCTION_CAP_PERCENT, storedPrefs.target)
+        : SPEED_REDUCTION_CAP_PERCENT;
     const initialLabSpeed = [1, 1.5, 2, 3, 4, 5, 6, 7, 8].includes(storedPrefs?.labSpeedMultiplier) ? storedPrefs.labSpeedMultiplier : 1;
     const initialLabCap = Number.isInteger(storedPrefs?.assistLabCap)
         && storedPrefs.assistLabCap >= data.assistCoreEfficiencyLabLevel
@@ -457,7 +462,7 @@ function renderWorkspace(workspace, data) {
             <form class="cf-planner-form" data-cf-planner-form>
                 <div class="cf-loadout-field">
                     <label for="cf-target-slow">Target speed reduction (%)</label>
-                    <input type="number" id="cf-target-slow" min="20" max="100" step="1" value="${initialTarget}" data-cf-target>
+                    <input type="number" id="cf-target-slow" min="20" max="${SPEED_REDUCTION_CAP_PERCENT}" step="1" value="${initialTarget}" data-cf-target>
                 </div>
                 <div class="cf-loadout-field">
                     <label for="cf-lab-speed">Lab boost (elite cells)</label>
