@@ -263,24 +263,34 @@ function renderPlanHtml(plan, data, loadoutContexts) {
         levelChanges.push(`Assist Module Substats (Core) to level ${plan.assistEfficiencyLevel} — ${cost.toLocaleString()} stones`);
     }
     if (plan.assistEfficiencyLabLevel != null) {
+        const farmingDays = farmingDaysToEarn(plan.labCoinCost, data.coinsPerHour);
+        const farmingNote = farmingDays != null ? `, ~${formatResearchDays(farmingDays)} of farming at your recent rate to earn the coins` : '';
         levelChanges.push(`Assist Module Substats (Core) lab to level ${plan.assistEfficiencyLabLevel} — `
-            + `${formatCoins(plan.labCoinCost)} coins, ${formatResearchDays(plan.labDurationDays)} of research (no stones)`);
+            + `${formatCoins(plan.labCoinCost)} coins, ${formatResearchDays(plan.labDurationDays)} of research${farmingNote} (no stones)`);
     }
     if (levelChanges.length > 0) {
         parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
     }
 
-    parts.push(planCostSummaryHtml(plan));
+    parts.push(planCostSummaryHtml(plan, data));
 
     return parts.join('');
 }
 
+/** Rough days of farming to earn `coins` at the save's recent coins/hour — `null` when that rate isn't known. A peak rate (best 3 runs), so an optimistic estimate. */
+function farmingDaysToEarn(coins, coinsPerHour) {
+    if (!coinsPerHour || coinsPerHour <= 0) return null;
+    return coins / coinsPerHour / 24;
+}
+
 /** The plan's total cost line — mentions coins/research days too when the plan raises assist efficiency via the lab instead of stones. */
-function planCostSummaryHtml(plan) {
+function planCostSummaryHtml(plan, data) {
     const pieces = [];
     if (plan.additionalCost > 0) pieces.push(`${plan.additionalCost.toLocaleString()} Power Stones`);
     if (plan.assistEfficiencyLabLevel != null) {
         pieces.push(`${formatCoins(plan.labCoinCost)} coins`, `${formatResearchDays(plan.labDurationDays)} of research`);
+        const farmingDays = farmingDaysToEarn(plan.labCoinCost, data.coinsPerHour);
+        if (farmingDays != null) pieces.push(`~${formatResearchDays(farmingDays)} of farming to earn the coins`);
     }
     if (pieces.length === 0) return '<p>You already meet that target on both loadouts with permanent uptime.</p>';
     return `<p>${pieces.join(' + ')} total.</p>`;

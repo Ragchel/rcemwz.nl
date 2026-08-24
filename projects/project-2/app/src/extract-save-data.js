@@ -5,6 +5,7 @@ const {
 } = require('thetowersdk/internal/save/modules');
 const { decodeModuleSubstats } = require('thetowersdk/internal/save/module-effects-decode');
 const { assistEfficiency } = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
+const { computeCoinsPerHourFromSaveRoot } = require('thetowersdk/internal/save/battle-history');
 // Deep imports instead of `thetowersdk/internal/save/relics` — that module
 // also drops in `save/workshop.js` for two generic array-coercion helpers,
 // which drags along the ~3MB workshop catalog for nothing this app uses.
@@ -253,6 +254,23 @@ function readLabSpeedRelicPercent(parsedRoot, warnings) {
 }
 
 /**
+ * The player's recent coins/hour, the same way the game's own stat panel
+ * derives it: mean of the three best runs in battle history. Used to turn a
+ * lab's coin cost into a rough "days of farming" estimate — a peak rate, not
+ * a sustained one, so that estimate is optimistic by nature.
+ */
+function readCoinsPerHour(parsedRoot, warnings) {
+    try {
+        const rate = computeCoinsPerHourFromSaveRoot(parsedRoot);
+        if (rate == null) throw new Error('no qualifying battle history runs');
+        return rate;
+    } catch {
+        warnings.push('Could not read recent coins/hour from this save — the lab plan will skip the farming-time estimate.');
+        return null;
+    }
+}
+
+/**
  * Reads everything the calculator needs from a decoded playerInfo.dat root.
  * Best-effort: any field that can't be located degrades to a safe default
  * plus a human-readable warning, instead of throwing.
@@ -272,6 +290,7 @@ function extractSaveData(parsedRoot) {
         labsCoinDiscountFraction: readLabsCoinDiscountFraction(parsedRoot, warnings),
         labsSpeedLabLevel: readLabsSpeedLabLevel(parsedRoot, warnings),
         labSpeedRelicPercent: readLabSpeedRelicPercent(parsedRoot, warnings),
+        coinsPerHour: readCoinsPerHour(parsedRoot, warnings),
         assistCoreEfficiency: assistCoreEfficiencyInfo.fraction,
         // The stone-level side of assist efficiency — separate from the
         // fraction above because the planner can consider leveling it
