@@ -182,6 +182,17 @@ function readChronoFieldLevels(parsedRoot, warnings) {
     }
 }
 
+function readDurationLabLevel(parsedRoot, warnings) {
+    try {
+        const level = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], CHRONO_FIELD_DURATION_LAB_INDEX);
+        if (level == null) throw new Error('lab row not found');
+        return level;
+    } catch {
+        warnings.push('Could not read the Chrono Field Duration lab from this save — assuming level 0.');
+        return 0;
+    }
+}
+
 function readDurationLabMaxed(parsedRoot, warnings) {
     try {
         const level = numberAt(parsedRoot?.[RESEARCH_LEVELS_KEY], CHRONO_FIELD_DURATION_LAB_INDEX);
@@ -287,6 +298,7 @@ function extractSaveData(parsedRoot) {
         stones,
         levels: readChronoFieldLevels(parsedRoot, warnings),
         durationLabMaxed: readDurationLabMaxed(parsedRoot, warnings),
+        durationLabLevel: readDurationLabLevel(parsedRoot, warnings),
         labsCoinDiscountFraction: readLabsCoinDiscountFraction(parsedRoot, warnings),
         labsSpeedLabLevel: readLabsSpeedLabLevel(parsedRoot, warnings),
         labSpeedRelicPercent: readLabSpeedRelicPercent(parsedRoot, warnings),

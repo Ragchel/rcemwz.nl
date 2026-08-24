@@ -23,6 +23,13 @@ const ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL = assistEfficiencyMaxStoneLevel('su
 const ASSIST_CORE_EFFICIENCY_LAB_SLUG = 'assist_module_substats_core';
 const ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL = labMaxCatalogLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG);
 
+// The Chrono Field Duration lab: an all-or-nothing +30s once fully maxed
+// (confirmed against `LAB_RESEARCH_BY_INDEX[53]` — same save index
+// `extract-save-data.js` already reads for `durationLabMaxed`), unlike the
+// assist-efficiency lab above, which scales smoothly per level.
+const CHRONO_FIELD_DURATION_LAB_SLUG = 'chrono_field_duration';
+const CHRONO_FIELD_DURATION_LAB_MAX_LEVEL = labMaxCatalogLevel(CHRONO_FIELD_DURATION_LAB_SLUG);
+
 function assistCoreEfficiencyFraction(stoneLevel, labLevel) {
     return Math.max(0, Math.min(1, computeAssistEfficiencyFraction({ hasAssist: true, stoneLevel, labLevel })));
 }
@@ -33,8 +40,7 @@ function assistCoreEfficiencyCumulativeCost(fromLevel, toLevel) {
 }
 
 /**
- * Coins and days of research to take the assist Core substat-efficiency
- * *lab* from one level to another — the alternative to buying stone levels.
+ * Coins and days of research to take a lab from one level to another.
  *
  * `coinDiscountFraction` is the player's combined coin-discount total; the
  * caller derives it from the save's own Labs Coin Discount lab, so it's
@@ -49,15 +55,15 @@ function assistCoreEfficiencyCumulativeCost(fromLevel, toLevel) {
  *
  * Returns `null` past the catalog's known levels.
  */
-function assistCoreEfficiencyLabCumulativeCost(fromLevel, toLevel, {
+function labCumulativeCost(labSlug, fromLevel, toLevel, {
     coinDiscountFraction = 0, labSpeedLabLevel = 0, labSpeedRelicPct = 0, speedUpMultiplier = 1,
 } = {}) {
     const coinDiscountLabLevel = coinDiscountFraction / 0.003;
     let coins = 0;
     let days = 0;
     for (let level = fromLevel + 1; level <= toLevel; level += 1) {
-        const levelCoins = labCoinCostToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level, { coinDiscountLabLevel });
-        const levelDays = labDurationDaysToReachLevel(ASSIST_CORE_EFFICIENCY_LAB_SLUG, level, {
+        const levelCoins = labCoinCostToReachLevel(labSlug, level, { coinDiscountLabLevel });
+        const levelDays = labDurationDaysToReachLevel(labSlug, level, {
             labSpeedLabLevel, labSpeedRelicPct, labSpeedMultiplier: speedUpMultiplier,
         });
         if (levelCoins == null || levelDays == null) return null;
@@ -65,6 +71,16 @@ function assistCoreEfficiencyLabCumulativeCost(fromLevel, toLevel, {
         days += levelDays;
     }
     return { coins, days };
+}
+
+/** Coins/days to take the assist Core substat-efficiency lab from one level to another — the alternative to buying stone levels. */
+function assistCoreEfficiencyLabCumulativeCost(fromLevel, toLevel, modifiers) {
+    return labCumulativeCost(ASSIST_CORE_EFFICIENCY_LAB_SLUG, fromLevel, toLevel, modifiers);
+}
+
+/** Coins/days to take the Chrono Field Duration lab from one level to another — only worth anything once it reaches `CHRONO_FIELD_DURATION_LAB_MAX_LEVEL` (see the constant's comment). */
+function durationLabCumulativeCost(fromLevel, toLevel, modifiers) {
+    return labCumulativeCost(CHRONO_FIELD_DURATION_LAB_SLUG, fromLevel, toLevel, modifiers);
 }
 
 const CF_STATS = CHRONO_FIELD_STATS;
@@ -264,6 +280,7 @@ module.exports = {
     RARITY_TIER,
     ASSIST_CORE_EFFICIENCY_MAX_STONE_LEVEL,
     ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
+    CHRONO_FIELD_DURATION_LAB_MAX_LEVEL,
     maxLevel,
     levelValue,
     cumulativeCost,
@@ -276,4 +293,5 @@ module.exports = {
     assistCoreEfficiencyFraction,
     assistCoreEfficiencyCumulativeCost,
     assistCoreEfficiencyLabCumulativeCost,
+    durationLabCumulativeCost,
 };

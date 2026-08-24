@@ -9,6 +9,9 @@ const {
     assistCoreEfficiencyCumulativeCost,
     assistCoreEfficiencyFraction,
     assistCoreEfficiencyLabCumulativeCost,
+    durationLabCumulativeCost,
+    ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
+    CHRONO_FIELD_DURATION_LAB_MAX_LEVEL,
     slotOverrideKey,
 } = require('./chrono-field-math');
 const { findCheapestPlan, findCheapestPlanViaLab } = require('./planner');
@@ -269,6 +272,12 @@ function renderPlanHtml(plan, data, loadoutContexts) {
         levelChanges.push(`Assist Module Substats (Core) lab to level ${plan.assistEfficiencyLabLevel} — `
             + `${formatCoins(plan.labCoinCost)} coins, ${formatResearchDays(plan.labDurationDays)} of research${farmingNote} (no stones)`);
     }
+    if (plan.durationLabCoinCost != null) {
+        const farmingDays = farmingDaysToEarn(plan.durationLabCoinCost, data.coinsPerHour);
+        const farmingNote = farmingDays != null ? `, ~${formatResearchDays(farmingDays)} of farming at your recent rate to earn the coins` : '';
+        levelChanges.push(`Chrono Field Duration lab to level ${CHRONO_FIELD_DURATION_LAB_MAX_LEVEL} (fully maxed, +30s) — `
+            + `${formatCoins(plan.durationLabCoinCost)} coins, ${formatResearchDays(plan.durationLabDurationDays)} of research${farmingNote} (no stones)`);
+    }
     if (levelChanges.length > 0) {
         parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
     }
@@ -291,6 +300,11 @@ function planCostSummaryHtml(plan, data) {
     if (plan.assistEfficiencyLabLevel != null) {
         pieces.push(`${formatCoins(plan.labCoinCost)} coins`, `${formatResearchDays(plan.labDurationDays)} of research`);
         const farmingDays = farmingDaysToEarn(plan.labCoinCost, data.coinsPerHour);
+        if (farmingDays != null) pieces.push(`~${formatResearchDays(farmingDays)} of farming to earn the coins`);
+    }
+    if (plan.durationLabCoinCost != null) {
+        pieces.push(`${formatCoins(plan.durationLabCoinCost)} coins`, `${formatResearchDays(plan.durationLabDurationDays)} of research`);
+        const farmingDays = farmingDaysToEarn(plan.durationLabCoinCost, data.coinsPerHour);
         if (farmingDays != null) pieces.push(`~${formatResearchDays(farmingDays)} of farming to earn the coins`);
     }
     if (pieces.length === 0) return '<p>You already meet that target on both loadouts with permanent uptime.</p>';
@@ -415,7 +429,12 @@ function renderWorkspace(workspace, data) {
     const farmingInitial = resolveLoadoutDefaults('farming', { runPerkActive: true });
     const tournamentInitial = resolveLoadoutDefaults('tournament', { battleConditionActive: true });
     const initialTarget = Number.isFinite(storedPrefs?.target) ? storedPrefs.target : 90;
-    const initialLabSpeed = [1, 2, 3, 4, 5, 6, 7, 8].includes(storedPrefs?.labSpeedMultiplier) ? storedPrefs.labSpeedMultiplier : 1;
+    const initialLabSpeed = [1, 1.5, 2, 3, 4, 5, 6, 7, 8].includes(storedPrefs?.labSpeedMultiplier) ? storedPrefs.labSpeedMultiplier : 1;
+    const initialLabCap = Number.isInteger(storedPrefs?.assistLabCap)
+        && storedPrefs.assistLabCap >= data.assistCoreEfficiencyLabLevel
+        && storedPrefs.assistLabCap <= ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL
+        ? storedPrefs.assistLabCap
+        : ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL;
 
     workspace.innerHTML = `
         <div class="cf-loadouts">
@@ -441,14 +460,18 @@ function renderWorkspace(workspace, data) {
                     <input type="number" id="cf-target-slow" min="20" max="100" step="1" value="${initialTarget}" data-cf-target>
                 </div>
                 <div class="cf-loadout-field">
-                    <label for="cf-lab-speed">Extra speed boost (events, etc.)</label>
+                    <label for="cf-lab-speed">Lab boost (elite cells)</label>
                     <select id="cf-lab-speed" data-cf-lab-speed>
-                        ${[1, 2, 3, 4, 5, 6, 7, 8].map((x) => `<option value="${x}"${x === initialLabSpeed ? ' selected' : ''}>${x}x</option>`).join('')}
+                        ${[1, 1.5, 2, 3, 4, 5, 6, 7, 8].map((x) => `<option value="${x}"${x === initialLabSpeed ? ' selected' : ''}>${x === 1 ? 'None' : `${x}x`}</option>`).join('')}
                     </select>
+                </div>
+                <div class="cf-loadout-field">
+                    <label for="cf-lab-cap">Cap Assist Module Substats lab at level</label>
+                    <input type="number" id="cf-lab-cap" min="${data.assistCoreEfficiencyLabLevel}" max="${ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL}" step="1" value="${initialLabCap}" data-cf-lab-cap>
                 </div>
                 <button type="submit">Find the cheapest plan</button>
             </form>
-            <p class="cf-planner-note">The lab investment's coin cost and research time already account for your save's Labs Coin Discount and Labs Speed lab levels, plus any unlocked relic with a Lab Speed bonus. The extra boost above is only for anything else that can't be read from the save, like a temporary event — leave it at 1x otherwise.</p>
+            <p class="cf-planner-note">The lab investment's coin cost and research time already account for your save's Labs Coin Discount and Labs Speed lab levels, plus any unlocked relic with a Lab Speed bonus. "Lab boost" above is the elite-cell purchase that temporarily multiplies research speed — pick whichever tier you plan to keep running, or "None" to ignore it. It only ticks while a lab is actually slotted for research, so it won't help unless this one is. The cap limits how far the plan is allowed to push the Assist Module Substats lab specifically (max ${ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL}).</p>
             <div class="cf-planner-result" data-cf-planner-result aria-live="polite"></div>
         </div>
     `;
@@ -480,12 +503,14 @@ function renderWorkspace(workspace, data) {
     function persist() {
         const targetInput = workspace.querySelector('[data-cf-target]');
         const labSpeedSelect = workspace.querySelector('[data-cf-lab-speed]');
+        const labCapInput = workspace.querySelector('[data-cf-lab-cap]');
         saveStoredPrefs({
             farming: { ...state.farming },
             tournament: { ...state.tournament },
             lockOverrides: Array.from(lockOverrides.entries()),
             target: Number(targetInput?.value),
             labSpeedMultiplier: Number(labSpeedSelect?.value),
+            assistLabCap: Number(labCapInput?.value),
         });
     }
 
@@ -579,17 +604,41 @@ function renderWorkspace(workspace, data) {
     workspace.querySelector('[data-cf-lab-speed]').addEventListener('change', () => {
         persist();
         // The plan itself (which slots, which stone levels) never depends on
-        // lab speed — only the lab route's day estimate does — so changing
-        // this re-derives just that number instead of re-running the search.
-        if (lastResult?.plan?.assistEfficiencyLabLevel == null) return;
-        const labCost = assistCoreEfficiencyLabCumulativeCost(
-            data.assistCoreEfficiencyLabLevel, lastResult.plan.assistEfficiencyLabLevel,
-            { coinDiscountFraction: data.labsCoinDiscountFraction, ...speedModifiers() },
-        );
-        if (!labCost) return;
-        lastResult.plan.labCoinCost = labCost.coins;
-        lastResult.plan.labDurationDays = labCost.days;
-        renderPlanResult();
+        // lab speed — only whichever lab route's day estimate is showing
+        // does — so changing this re-derives just that number instead of
+        // re-running the search.
+        if (!lastResult) return;
+        let changed = false;
+        if (lastResult.plan.assistEfficiencyLabLevel != null) {
+            const labCost = assistCoreEfficiencyLabCumulativeCost(
+                data.assistCoreEfficiencyLabLevel, lastResult.plan.assistEfficiencyLabLevel,
+                { coinDiscountFraction: data.labsCoinDiscountFraction, ...speedModifiers() },
+            );
+            if (labCost) {
+                lastResult.plan.labCoinCost = labCost.coins;
+                lastResult.plan.labDurationDays = labCost.days;
+                changed = true;
+            }
+        }
+        if (lastResult.plan.durationLabCoinCost != null) {
+            const labCost = durationLabCumulativeCost(
+                data.durationLabLevel, CHRONO_FIELD_DURATION_LAB_MAX_LEVEL,
+                { coinDiscountFraction: data.labsCoinDiscountFraction, ...speedModifiers() },
+            );
+            if (labCost) {
+                lastResult.plan.durationLabCoinCost = labCost.coins;
+                lastResult.plan.durationLabDurationDays = labCost.days;
+                changed = true;
+            }
+        }
+        if (changed) renderPlanResult();
+    });
+    workspace.querySelector('[data-cf-lab-cap]').addEventListener('change', () => {
+        persist();
+        // Unlike the speed multiplier, the cap can change which plan is
+        // cheapest (or whether the lab route is even reachable), so this
+        // needs a full re-plan rather than just updating a display number.
+        if (lastResult) runPlanner();
     });
 
     function runPlanner() {
@@ -624,28 +673,59 @@ function renderWorkspace(workspace, data) {
             };
 
             const coinDiscountFraction = data.labsCoinDiscountFraction;
+            const maxLabLevel = Number(workspace.querySelector('[data-cf-lab-cap]').value) || data.assistCoreEfficiencyLabLevel;
+
+            // Three independent ways to close the gap, each evaluated on its
+            // own and compared by stone cost: buy stone levels outright, buy
+            // assist-module substat efficiency via its lab instead of
+            // stones, or finish the (all-or-nothing) Chrono Field Duration
+            // lab instead of buying extra Duration stone levels. Whichever
+            // reaches the target in the fewest stones wins; the others are
+            // dropped rather than combined, so this isn't the true joint
+            // optimum across all three, just the best of each considered
+            // separately — matches how the assist-lab option already works.
+            const candidates = [];
 
             const plan = findCheapestPlan(plannerArgs);
-            // Raising assist efficiency via the lab (coins + days, no stones)
-            // is an alternative to buying stone levels for it — only worth
-            // taking when it actually reaches a lower stone cost. The coin/
-            // speed modifiers only affect the coin/day estimate, not which
-            // plan wins (that's still ranked in stones).
-            const labPlan = findCheapestPlanViaLab({ ...plannerArgs, coinDiscountFraction, ...speedModifiers() });
-            const cheaper = !plan ? labPlan
-                : (labPlan && labPlan.additionalCost < plan.additionalCost) ? labPlan
-                : plan;
+            if (plan) candidates.push({ plan, loadoutContexts, lead: '' });
 
-            if (!cheaper) {
+            const labPlan = findCheapestPlanViaLab({ ...plannerArgs, coinDiscountFraction, ...speedModifiers(), maxLabLevel });
+            if (labPlan) {
+                candidates.push({
+                    plan: labPlan,
+                    loadoutContexts,
+                    lead: !plan ? '<p>Not reachable by buying stone levels alone — raising the Assist Module Substats (Core) lab gets there instead:</p>' : '',
+                });
+            }
+
+            if (!data.durationLabMaxed) {
+                const maxedLoadoutContexts = loadoutContexts.map((loadout) => ({ ...loadout, durationLabMaxed: true }));
+                const durationLabPlan = findCheapestPlan({ ...plannerArgs, loadouts: maxedLoadoutContexts });
+                if (durationLabPlan) {
+                    const labCost = durationLabCumulativeCost(
+                        data.durationLabLevel, CHRONO_FIELD_DURATION_LAB_MAX_LEVEL, { coinDiscountFraction, ...speedModifiers() },
+                    );
+                    if (labCost) {
+                        durationLabPlan.durationLabCoinCost = labCost.coins;
+                        durationLabPlan.durationLabDurationDays = labCost.days;
+                        candidates.push({
+                            plan: durationLabPlan,
+                            loadoutContexts: maxedLoadoutContexts,
+                            lead: (!plan && !labPlan) ? '<p>Not reachable by buying stone levels alone — finishing the Chrono Field Duration lab gets there instead:</p>' : '',
+                        });
+                    }
+                }
+            }
+
+            if (candidates.length === 0) {
                 lastResult = null;
                 resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
                 return;
             }
 
-            const lead = (!plan && labPlan)
-                ? '<p>Not reachable by buying stone levels alone — raising the Assist Module Substats (Core) lab gets there instead:</p>'
-                : '';
-            lastResult = { plan: cheaper, loadoutContexts, lead };
+            lastResult = candidates.reduce((best, candidate) => (
+                !best || candidate.plan.additionalCost < best.plan.additionalCost ? candidate : best
+            ));
             renderPlanResult();
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;

@@ -433,9 +433,15 @@ function findCheapestPlanViaLab({
     currentLevels, coreModules, assistEfficiencyStoneLevel, assistEfficiencyLabLevel,
     loadouts, eligibleSlots, fixedOverrides, target,
     coinDiscountFraction = 0, labSpeedLabLevel = 0, labSpeedRelicPct = 0, speedUpMultiplier = 1,
+    maxLabLevel = ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL,
 }) {
     const sweeping = assistEfficiencyCouldMatter(coreModules, loadouts, eligibleSlots);
-    const maxSweepLevel = sweeping ? ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL : assistEfficiencyLabLevel;
+    // `maxLabLevel` is the player's own cap (e.g. "don't suggest past level
+    // 10") — clamped to the track's real ceiling, and never below the
+    // player's current level (a cap under that just means "no further
+    // investment", not an error).
+    const cappedMaxLevel = Math.max(assistEfficiencyLabLevel, Math.min(maxLabLevel, ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL));
+    const maxSweepLevel = sweeping ? cappedMaxLevel : assistEfficiencyLabLevel;
     const maxExhaustiveSlots = sweeping ? MAX_EXHAUSTIVE_SLOTS_DURING_EFFICIENCY_SWEEP : MAX_EXHAUSTIVE_SLOTS;
 
     let best = null;
