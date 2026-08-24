@@ -492,31 +492,23 @@ function renderWorkspace(workspace, data) {
             };
 
             const plan = findCheapestPlan(plannerArgs);
+            // Raising assist efficiency via the lab (coins + days, no stones)
+            // is an alternative to buying stone levels for it — only worth
+            // taking when it actually reaches a lower stone cost.
+            const labPlan = findCheapestPlanViaLab(plannerArgs);
+            const cheaper = !plan ? labPlan
+                : (labPlan && labPlan.additionalCost < plan.additionalCost) ? labPlan
+                : plan;
 
-            if (!plan) {
-                // Stones alone can't reach the target — see whether raising
-                // assist efficiency via the lab (a lower ceiling than stones,
-                // since the stone level stays fixed here) rescues it anyway.
-                const labRescue = findCheapestPlanViaLab(plannerArgs);
-                resultEl.innerHTML = labRescue
-                    ? `<p>Not reachable by buying stone levels alone — but raising the Assist Module Substats (Core) lab gets there instead:</p>${renderPlanHtml(labRescue, data, loadoutContexts)}`
-                    : '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
+            if (!cheaper) {
+                resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
                 return;
             }
 
-            let html = renderPlanHtml(plan, data, loadoutContexts);
-
-            // Only worth mentioning when it actually saves stones — otherwise
-            // the lab route just spends coins/time for nothing extra.
-            const labAlt = findCheapestPlanViaLab(plannerArgs);
-            if (labAlt && labAlt.additionalCost < plan.additionalCost) {
-                html += `<div class="cf-plan-alt">
-                    <h4>Cheaper option: raise Substat Efficiency via the lab instead of stones</h4>
-                    ${renderPlanHtml(labAlt, data, loadoutContexts)}
-                </div>`;
-            }
-
-            resultEl.innerHTML = html;
+            const lead = (!plan && labPlan)
+                ? '<p>Not reachable by buying stone levels alone — raising the Assist Module Substats (Core) lab gets there instead:</p>'
+                : '';
+            resultEl.innerHTML = lead + renderPlanHtml(cheaper, data, loadoutContexts);
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }
