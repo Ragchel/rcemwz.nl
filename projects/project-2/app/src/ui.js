@@ -146,7 +146,7 @@ function breakdownDetailsHtml({ levels, efficiency, breakdown, durationLabMaxed,
         { text: `Duration level ${levels.duration}`, value: levelValue('Duration', levels.duration) },
         { text: 'Duration lab maxed', value: durationLabMaxed ? 30 : 0 },
         { text: 'run perk', value: runPerkActive ? 5 : 0 },
-        { text: 'battle condition', value: battleConditionActive ? -10 : 0 },
+        { text: 'Ultimate Weapon Durations battle condition', value: battleConditionActive ? -10 : 0 },
         { text: 'primary module substat', value: breakdown.primary.duration },
         { text: assistLabel, value: breakdown.assist.duration * efficiency },
     ];
@@ -427,7 +427,7 @@ function renderWorkspace(workspace, data) {
             ${loadoutCardHtml('tournament', 'Tournament loadout', data.coreModules, `
                 <div class="cf-loadout-toggle">
                     <input type="checkbox" id="cf-tournament-bc" data-cf-battle-condition${tournamentInitial.battleConditionActive ? ' checked' : ''}>
-                    <label for="cf-tournament-bc">"Reduce Chrono Field duration by 10s" battle condition active</label>
+                    <label for="cf-tournament-bc">"Ultimate Weapon Durations" battle condition active (-10s Chrono Field duration)</label>
                 </div>
             `, tournamentInitial)}
         </div>
