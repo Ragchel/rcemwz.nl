@@ -13,7 +13,15 @@ Put card images in the `cards/` folder and name them for their physical pocket:
 
 Cards are placed from left to right, then top to bottom. WebP is used to keep the
 collection quick to load. If your source image is a PNG or JPEG, export or convert
-it to WebP first. Empty or missing numbers remain visible as empty pockets.
+it to WebP first. Keep cards at no more than 720 pixels high; this is enough for
+the enlarged card view without storing detail the site cannot display. With
+ImageMagick, a suitable export command is:
+
+```sh
+magick source.png -resize '720x720>' -strip -quality 80 -define webp:method=6 card-N.webp
+```
+
+Empty or missing numbers remain visible as empty pockets.
 
 The optional `preview.webp` is shared by the homepage and project overview. When
 it is missing, the site shows a built-in illustrated binder cover instead.
