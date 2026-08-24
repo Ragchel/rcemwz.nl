@@ -4,9 +4,7 @@ const {
     computeEffectiveChronoField,
     computeLoadoutSubstats,
     computeLoadoutSubstatsBreakdown,
-    cumulativeCost,
     levelValue,
-    assistCoreEfficiencyCumulativeCost,
     assistCoreEfficiencyFraction,
     assistCoreEfficiencyLabCumulativeCost,
     durationLabCumulativeCost,
@@ -178,13 +176,6 @@ function breakdownDetailsHtml({ levels, efficiency, breakdown, durationLabMaxed,
         </details>`;
 }
 
-function substatLineHtml(item) {
-    const sign = item.value > 0 ? '+' : '';
-    const unit = item.stat === 'speedReduction' ? '%' : 's';
-    const note = item.note ? ` (${item.note})` : '';
-    return `<li>Slot ${item.slotNumber} of ${escapeHtml(item.moduleLabel)}: roll ${CF_STAT_LABELS[item.stat]} ${sign}${item.value}${unit} (${item.rarity})${escapeHtml(note)}</li>`;
-}
-
 /**
  * What each loadout's Duration/Cooldown/Speed Reduction actually comes out
  * to once the whole plan is applied — the new stone levels, the suggested
@@ -193,7 +184,7 @@ function substatLineHtml(item) {
  * value alone isn't this: two loadouts can end up with different effective
  * numbers from the very same level, depending on their own substats/perks.
  */
-function finalLoadoutResultHtml(loadout, plan, data) {
+function computeFinalLoadoutResult(loadout, plan, data) {
     const finalOverrides = new Map(
         plan.assignment.map((item) => [slotOverrideKey(item.moduleKey, item.slotNumber), { stat: item.stat, value: item.value }]),
     );
@@ -212,82 +203,55 @@ function finalLoadoutResultHtml(loadout, plan, data) {
         runPerkActive: loadout.runPerkActive,
         battleConditionActive: loadout.battleConditionActive,
     });
+    return { result, breakdown, levels: finalLevels, efficiency: finalEfficiency };
+}
 
-    const statusClass = result.permanent ? 'is-reached' : 'is-short';
-    const statusText = result.permanent ? 'permanent' : 'not permanent';
-    return `<p>${escapeHtml(loadout.label)} ends up at: <span class="cf-result-status ${statusClass}">${statusText}</span> — `
-        + `${result.speedReductionEff.toFixed(1)}% slow, ${result.durationEff.toFixed(1)}s duration, ${result.cooldownEff.toFixed(1)}s cooldown</p>`
-        + breakdownDetailsHtml({
-            levels: finalLevels,
-            efficiency: finalEfficiency,
-            breakdown,
-            durationLabMaxed: loadout.durationLabMaxed,
-            runPerkActive: loadout.runPerkActive,
-            battleConditionActive: loadout.battleConditionActive,
-        });
+/** One table cell: the current level, or the current (struck through) on one line and the new one below it, same as a planned slot. */
+function levelCellHtml(before, after, formatLevel) {
+    if (after == null || after === before) return formatLevel(before);
+    return `<span class="cf-slot-before">${formatLevel(before)}</span><span class="cf-slot-after">${formatLevel(after)}</span>`;
 }
 
 /**
- * `loadoutContexts` need an `id`/`label` (e.g. "farming"/"Farming") alongside
- * their `primaryKey`/`assistKey`, so the substat assignment — which belongs
- * to a module, not a loadout — can be grouped by whichever loadout(s)
- * currently use that module, sorted by module within each group. Levels and
- * assist efficiency are account-wide, so those stay a single shared list.
+ * The account-wide stone/lab levels behind Duration/Cooldown/Speed Reduction
+ * and the assist Core substat-efficiency lab, as a table — the save's
+ * current values with no `plan`, or `current → after` per cell once one's
+ * applied. Stays a table either way, so finding a plan doesn't change the
+ * shape of this box. Which substats to roll is shown at the affected slot
+ * itself (see `slotsHtml`'s "is-planned" state), not repeated here.
  */
-function renderPlanHtml(plan, data, loadoutContexts) {
-    const parts = [];
+function renderInvestmentTableHtml(data, plan, lead) {
+    const durationLabMaxedAfter = plan?.durationLabCoinCost != null;
+    const durationLabCell = data.durationLabMaxed
+        ? 'Maxed (+30s)'
+        : `Level ${data.durationLabLevel}/${CHRONO_FIELD_DURATION_LAB_MAX_LEVEL}`;
 
-    for (const loadout of loadoutContexts) {
-        const roleRank = (item) => (item.moduleKey === loadout.primaryKey ? 0 : 1);
-        const items = plan.assignment
-            .filter((item) => item.moduleKey === loadout.primaryKey || item.moduleKey === loadout.assistKey)
-            .slice()
-            .sort((a, b) => roleRank(a) - roleRank(b) || a.slotNumber - b.slotNumber);
+    const rows = [
+        ['Duration', levelCellHtml(data.levels.duration, plan?.levels?.duration, (lvl) => `Level ${lvl} (${levelValue('Duration', lvl)}s)`),
+            durationLabMaxedAfter ? `<span class="cf-slot-before">${durationLabCell}</span><span class="cf-slot-after">Maxed (+30s)</span>` : durationLabCell],
+        ['Cooldown', levelCellHtml(data.levels.cooldown, plan?.levels?.cooldown, (lvl) => `Level ${lvl} (${levelValue('Cooldown', lvl)}s)`), '—'],
+        ['Speed reduction', levelCellHtml(data.levels.speed, plan?.levels?.speed, (lvl) => `Level ${lvl} (${levelValue('Speed', lvl)}%)`), '—'],
+        ['Assist Module Substats (Core)',
+            levelCellHtml(data.assistCoreEfficiencyStoneLevel, plan?.assistEfficiencyLevel, (lvl) => `Level ${lvl} (+${lvl}%)`),
+            levelCellHtml(data.assistCoreEfficiencyLabLevel, plan?.assistEfficiencyLabLevel, (lvl) => `Level ${lvl} (+${lvl}%)`)],
+    ];
 
-        const section = items.length > 0
-            ? `<p>${escapeHtml(loadout.label)} — get these substats:</p><ul>${items.map(substatLineHtml).join('')}</ul>`
-            : '';
-        parts.push(section + finalLoadoutResultHtml(loadout, plan, data));
-    }
+    const table = `
+        <table class="cf-investment-table">
+            <thead><tr><th scope="col">Current</th><th scope="col">Stone</th><th scope="col">Lab</th></tr></thead>
+            <tbody>
+                ${rows.map(([label, stone, lab]) => `<tr><th scope="row">${label}</th><td>${stone}</td><td>${lab}</td></tr>`).join('')}
+            </tbody>
+        </table>`;
 
-    const levelChanges = [];
-    if (plan.levels) {
-        if (plan.levels.duration !== data.levels.duration) {
-            const cost = cumulativeCost('Duration', plan.levels.duration) - cumulativeCost('Duration', data.levels.duration);
-            levelChanges.push(`Duration to level ${plan.levels.duration} — ${cost.toLocaleString()} stones`);
-        }
-        if (plan.levels.cooldown !== data.levels.cooldown) {
-            const cost = cumulativeCost('Cooldown', plan.levels.cooldown) - cumulativeCost('Cooldown', data.levels.cooldown);
-            levelChanges.push(`Cooldown to level ${plan.levels.cooldown} — ${cost.toLocaleString()} stones`);
-        }
-        if (plan.levels.speed !== data.levels.speed) {
-            const cost = cumulativeCost('Speed', plan.levels.speed) - cumulativeCost('Speed', data.levels.speed);
-            levelChanges.push(`Speed Reduction to level ${plan.levels.speed} — ${cost.toLocaleString()} stones`);
-        }
-    }
-    if (plan.assistEfficiencyLevel != null) {
-        const cost = assistCoreEfficiencyCumulativeCost(data.assistCoreEfficiencyStoneLevel, plan.assistEfficiencyLevel);
-        levelChanges.push(`Assist Module Substats (Core) to level ${plan.assistEfficiencyLevel} — ${cost.toLocaleString()} stones`);
-    }
-    if (plan.assistEfficiencyLabLevel != null) {
-        const farmingDays = farmingDaysToEarn(plan.labCoinCost, data.coinsPerHour);
-        const farmingNote = farmingDays != null ? `, ~${formatResearchDays(farmingDays)} of farming at your recent rate to earn the coins` : '';
-        levelChanges.push(`Assist Module Substats (Core) lab to level ${plan.assistEfficiencyLabLevel} — `
-            + `${formatCoins(plan.labCoinCost)} coins, ${formatResearchDays(plan.labDurationDays)} of research${farmingNote} (no stones)`);
-    }
-    if (plan.durationLabCoinCost != null) {
-        const farmingDays = farmingDaysToEarn(plan.durationLabCoinCost, data.coinsPerHour);
-        const farmingNote = farmingDays != null ? `, ~${formatResearchDays(farmingDays)} of farming at your recent rate to earn the coins` : '';
-        levelChanges.push(`Chrono Field Duration lab to level ${CHRONO_FIELD_DURATION_LAB_MAX_LEVEL} (fully maxed, +30s) — `
-            + `${formatCoins(plan.durationLabCoinCost)} coins, ${formatResearchDays(plan.durationLabDurationDays)} of research${farmingNote} (no stones)`);
-    }
-    if (levelChanges.length > 0) {
-        parts.push(`<p>Level up:</p><ul>${levelChanges.map((change) => `<li>${escapeHtml(change)}</li>`).join('')}</ul>`);
-    }
+    // On the same line as each other: the plan's total cost (when there is
+    // one) followed by how many Power Stones are on hand right now.
+    const costText = plan ? planCostSummaryHtml(plan, data) : '';
+    const stonesText = data.stones != null ? `${data.stones.toLocaleString()} Power Stones available.` : '';
+    const summaryParts = [costText, stonesText].filter(Boolean);
+    const summary = summaryParts.length > 0 ? `<p class="cf-investment-summary">${summaryParts.join(' ')}</p>` : '';
 
-    parts.push(planCostSummaryHtml(plan, data));
-
-    return parts.join('');
+    return `${lead || ''}${table}${summary}`;
 }
 
 /** Rough days of farming to earn `coins` at the save's recent coins/hour — `null` when that rate isn't known. A peak rate (best 3 runs), so an optimistic estimate. */
@@ -296,38 +260,70 @@ function farmingDaysToEarn(coins, coinsPerHour) {
     return coins / coinsPerHour / 24;
 }
 
-/** The plan's total cost line — mentions coins/research days too when the plan raises assist efficiency via the lab instead of stones. */
+/**
+ * The plan's total cost — mentions coins/research days too when the plan
+ * raises assist efficiency via the lab instead of stones. Returns bare text
+ * (the quantities bolded), not a `<p>`, so the caller can put it on the same
+ * line as the "N Power Stones available" line.
+ */
 function planCostSummaryHtml(plan, data) {
     const pieces = [];
-    if (plan.additionalCost > 0) pieces.push(`${plan.additionalCost.toLocaleString()} Power Stones`);
+    if (plan.additionalCost > 0) pieces.push(`<strong>${plan.additionalCost.toLocaleString()}</strong> Power Stones`);
     if (plan.assistEfficiencyLabLevel != null) {
-        pieces.push(`${formatCoins(plan.labCoinCost)} coins`, `${formatResearchDays(plan.labDurationDays)} of research`);
+        pieces.push(`<strong>${formatCoins(plan.labCoinCost)}</strong> coins`, `<strong>${formatResearchDays(plan.labDurationDays)}</strong> of research`);
         const farmingDays = farmingDaysToEarn(plan.labCoinCost, data.coinsPerHour);
-        if (farmingDays != null) pieces.push(`~${formatResearchDays(farmingDays)} of farming to earn the coins`);
+        if (farmingDays != null) pieces.push(`<strong>~${formatResearchDays(farmingDays)}</strong> of farming to earn the coins`);
     }
     if (plan.durationLabCoinCost != null) {
-        pieces.push(`${formatCoins(plan.durationLabCoinCost)} coins`, `${formatResearchDays(plan.durationLabDurationDays)} of research`);
+        pieces.push(`<strong>${formatCoins(plan.durationLabCoinCost)}</strong> coins`, `<strong>${formatResearchDays(plan.durationLabDurationDays)}</strong> of research`);
         const farmingDays = farmingDaysToEarn(plan.durationLabCoinCost, data.coinsPerHour);
-        if (farmingDays != null) pieces.push(`~${formatResearchDays(farmingDays)} of farming to earn the coins`);
+        if (farmingDays != null) pieces.push(`<strong>~${formatResearchDays(farmingDays)}</strong> of farming to earn the coins`);
     }
-    if (pieces.length === 0) return '<p>You already meet that target on both loadouts with permanent uptime.</p>';
-    return `<p>${pieces.join(' + ')} total.</p>`;
+    if (pieces.length === 0) {
+        return plan.assignment.length > 0
+            ? 'No stone or coin cost — just reroll the highlighted substat(s).'
+            : 'You already meet that target on both loadouts with permanent uptime.';
+    }
+    return `${pieces.join(' + ')} total.`;
 }
 
-function slotsHtml(module, lockOverrides) {
+/** One suggested substat, formatted the same way a real rolled substat would read (e.g. "Mythic Chrono Field Speed Reduction +11%"). */
+function plannedSlotLabelHtml(item) {
+    const sign = item.value > 0 ? '+' : '';
+    const unit = item.stat === 'speedReduction' ? '%' : 's';
+    return `${escapeHtml(item.rarity)} ${escapeHtml(CF_STAT_LABELS[item.stat])} ${sign}${item.value}${unit}`;
+}
+
+/** `moduleKey -> (slotNumber -> assignment item)`, for looking up which slot(s) a module has a plan suggestion for. `null` when no plan is applied. */
+function buildPlannedByModule(plan) {
+    if (!plan) return null;
+    const map = new Map();
+    for (const item of plan.assignment) {
+        if (!map.has(item.moduleKey)) map.set(item.moduleKey, new Map());
+        map.get(item.moduleKey).set(item.slotNumber, item);
+    }
+    return map;
+}
+
+function slotsHtml(module, lockOverrides, plannedForModule) {
     if (!module) return '<p class="cf-module-slots-empty">Choose a module to see its substats.</p>';
 
     const items = module.slots.map((slot) => {
         const locked = isSlotLocked(module, slot, lockOverrides);
+        const planned = plannedForModule?.get(slot.slot);
         const classes = ['cf-module-slot'];
         if (slot.unlocked && slot.isChronoField) classes.push('is-cf');
         if (!slot.unlocked) classes.push('is-empty');
         if (locked) classes.push('is-locked');
+        if (planned) classes.push('is-planned');
 
         const note = slot.note ? ` — ${escapeHtml(slot.note)}` : '';
-        const label = slot.unlocked
+        const beforeLabel = slot.unlocked
             ? `${slot.rarity ? `${escapeHtml(slot.rarity)} ` : ''}${escapeHtml(slot.label)}${slot.displayValue ? ` ${escapeHtml(slot.displayValue)}` : ''}`
             : `Not yet unlocked${note}`;
+        const label = planned
+            ? `<span class="cf-slot-before">${beforeLabel}</span><span class="cf-slot-after">${plannedSlotLabelHtml(planned)}</span>`
+            : beforeLabel;
 
         return `
             <li class="${classes.join(' ')}">
@@ -342,9 +338,9 @@ function slotsHtml(module, lockOverrides) {
     return `<ul class="cf-module-slots">${items.join('')}</ul>`;
 }
 
-function renderModuleSlots(container, modulesByKey, key, lockOverrides) {
+function renderModuleSlots(container, modulesByKey, key, lockOverrides, plannedByModule) {
     const module = modulesByKey.get(key);
-    container.innerHTML = slotsHtml(module, lockOverrides);
+    container.innerHTML = slotsHtml(module, lockOverrides, plannedByModule?.get(key));
 }
 
 function loadoutInputs(data, modulesByKey, loadoutState) {
@@ -361,17 +357,40 @@ function formatSeconds(value) {
     return `${value.toFixed(1)}s`;
 }
 
-function renderResult(container, result, breakdownArgs) {
+function statusBadgeHtml(result) {
     const statusClass = result.permanent ? 'is-reached' : 'is-short';
     const statusText = result.permanent ? 'Permanent uptime reached' : 'Not permanent yet';
-    const marginLabel = result.permanent ? 'Margin to spare' : 'Still short by';
+    return `<span class="cf-result-status ${statusClass}">${statusText}</span>`;
+}
+
+/** One `<dt>`/`<dd>` pair, showing `before → after` (after bolded) when a plan changes the value, otherwise just the single value. */
+function statRowHtml(label, before, after, unit, digits) {
+    const beforeText = before.toFixed(digits);
+    if (after == null || after.toFixed(digits) === beforeText) {
+        return `<dt>${label}</dt><dd>${(after ?? before).toFixed(digits)}${unit}</dd>`;
+    }
+    return `<dt>${label}</dt><dd>${beforeText}${unit} <span class="cf-slot-arrow" aria-hidden="true">→</span> <strong>${after.toFixed(digits)}${unit}</strong></dd>`;
+}
+
+/**
+ * The loadout's current Duration/Cooldown/Speed Reduction (`before`), plus,
+ * once a plan is applied, what they become (`after`) — shown as `before →
+ * after` per stat rather than only the final numbers, so it's clear what the
+ * plan actually changes versus what was already true beforehand.
+ */
+function renderResult(container, before, after, breakdownArgs) {
+    const shown = after || before;
+    const statusHtml = (after && before.permanent !== after.permanent)
+        ? `${statusBadgeHtml(before)} <span class="cf-slot-arrow" aria-hidden="true">→</span> ${statusBadgeHtml(after)}`
+        : statusBadgeHtml(shown);
+    const marginLabel = shown.permanent ? 'Margin to spare' : 'Still short by';
     container.innerHTML = `
-        <span class="cf-result-status ${statusClass}">${statusText}</span>
+        ${statusHtml}
         <dl>
-            <dt>Speed reduction</dt><dd>${result.speedReductionEff.toFixed(1)}%</dd>
-            <dt>Duration</dt><dd>${formatSeconds(result.durationEff)}</dd>
-            <dt>Cooldown</dt><dd>${formatSeconds(result.cooldownEff)}</dd>
-            <dt>${marginLabel}</dt><dd>${formatSeconds(Math.abs(result.marginSeconds))}</dd>
+            ${statRowHtml('Speed reduction', before.speedReductionEff, after?.speedReductionEff, '%', 1)}
+            ${statRowHtml('Duration', before.durationEff, after?.durationEff, 's', 1)}
+            ${statRowHtml('Cooldown', before.cooldownEff, after?.cooldownEff, 's', 1)}
+            <dt>${marginLabel}</dt><dd>${formatSeconds(Math.abs(shown.marginSeconds))}</dd>
         </dl>
         ${breakdownDetailsHtml(breakdownArgs)}
     `;
@@ -442,6 +461,36 @@ function renderWorkspace(workspace, data) {
         : ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL;
 
     workspace.innerHTML = `
+        <div class="cf-planner">
+            <h3>Plan your build</h3>
+            <p>Uses any slot marked Changeable to figure out what to roll there, on top of stone levels. Applying a plan highlights the changed slot(s) below and shows before/after stats on each loadout.</p>
+            <div class="cf-planner-row">
+                <form class="cf-planner-form cf-planner-box" data-cf-planner-form>
+                    <div class="cf-loadout-field">
+                        <label for="cf-target-slow">Target speed reduction (%)</label>
+                        <input type="number" id="cf-target-slow" min="20" max="${SPEED_REDUCTION_CAP_PERCENT}" step="1" value="${initialTarget}" data-cf-target>
+                    </div>
+                    <div class="cf-loadout-field">
+                        <label for="cf-lab-speed">Lab boost (elite cells)</label>
+                        <select id="cf-lab-speed" data-cf-lab-speed>
+                            ${[1, 1.5, 2, 3, 4, 5, 6, 7, 8].map((x) => `<option value="${x}"${x === initialLabSpeed ? ' selected' : ''}>${x === 1 ? 'None' : `${x}x`}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="cf-loadout-field">
+                        <label for="cf-lab-cap">Cap Assist Module Substats lab at level</label>
+                        <input type="number" id="cf-lab-cap" min="${data.assistCoreEfficiencyLabLevel}" max="${ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL}" step="1" value="${initialLabCap}" data-cf-lab-cap>
+                    </div>
+                    <div class="cf-planner-actions">
+                        <button type="submit" class="cf-planner-submit">Find the cheapest plan</button>
+                        <button type="button" class="cf-reset-button" data-cf-reset title="Discard every change made here and go back to what the save file itself says">Reset to save file</button>
+                    </div>
+                </form>
+                <div class="cf-investment-box cf-planner-box">
+                    <h4>Investment</h4>
+                    <div class="cf-planner-result" data-cf-planner-result aria-live="polite">${renderInvestmentTableHtml(data, null)}</div>
+                </div>
+            </div>
+        </div>
         <div class="cf-loadouts">
             ${loadoutCardHtml('farming', 'Farming loadout', data.coreModules, `
                 <div class="cf-loadout-toggle">
@@ -455,29 +504,6 @@ function renderWorkspace(workspace, data) {
                     <label for="cf-tournament-bc">"Ultimate Weapon Durations" battle condition active (-10s Chrono Field duration)</label>
                 </div>
             `, tournamentInitial)}
-        </div>
-        <div class="cf-planner">
-            <h3>Plan your build</h3>
-            <p>Uses any slot marked Changeable to figure out what to roll there, on top of stone levels.</p>
-            <form class="cf-planner-form" data-cf-planner-form>
-                <div class="cf-loadout-field">
-                    <label for="cf-target-slow">Target speed reduction (%)</label>
-                    <input type="number" id="cf-target-slow" min="20" max="${SPEED_REDUCTION_CAP_PERCENT}" step="1" value="${initialTarget}" data-cf-target>
-                </div>
-                <div class="cf-loadout-field">
-                    <label for="cf-lab-speed">Lab boost (elite cells)</label>
-                    <select id="cf-lab-speed" data-cf-lab-speed>
-                        ${[1, 1.5, 2, 3, 4, 5, 6, 7, 8].map((x) => `<option value="${x}"${x === initialLabSpeed ? ' selected' : ''}>${x === 1 ? 'None' : `${x}x`}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="cf-loadout-field">
-                    <label for="cf-lab-cap">Cap Assist Module Substats lab at level</label>
-                    <input type="number" id="cf-lab-cap" min="${data.assistCoreEfficiencyLabLevel}" max="${ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL}" step="1" value="${initialLabCap}" data-cf-lab-cap>
-                </div>
-                <button type="submit">Find the cheapest plan</button>
-            </form>
-            <p class="cf-planner-note">The lab investment's coin cost and research time already account for your save's Labs Coin Discount and Labs Speed lab levels, plus any unlocked relic with a Lab Speed bonus. "Lab boost" above is the elite-cell purchase that temporarily multiplies research speed — pick whichever tier you plan to keep running, or "None" to ignore it. It only ticks while a lab is actually slotted for research, so it won't help unless this one is. The cap limits how far the plan is allowed to push the Assist Module Substats lab specifically (max ${ASSIST_CORE_EFFICIENCY_MAX_LAB_LEVEL}).</p>
-            <div class="cf-planner-result" data-cf-planner-result aria-live="polite"></div>
         </div>
     `;
 
@@ -498,11 +524,17 @@ function renderWorkspace(workspace, data) {
     // that search picks the plan by stone cost alone, which speed never
     // changes, so only the display needs to change.
     let lastResult = null;
+    // The plan currently reflected in the loadout cards below (highlighted
+    // slots, before/after stats) — same as `lastResult.plan`/`loadoutContexts`
+    // once a search succeeds, `null` again once it's cleared or reset.
+    let appliedPlan = null;
+    let appliedLoadoutContexts = null;
 
     function renderPlanResult() {
-        if (!lastResult) return;
         const resultEl = workspace.querySelector('[data-cf-planner-result]');
-        resultEl.innerHTML = lastResult.lead + renderPlanHtml(lastResult.plan, data, lastResult.loadoutContexts);
+        resultEl.innerHTML = lastResult
+            ? renderInvestmentTableHtml(data, lastResult.plan, lastResult.lead)
+            : renderInvestmentTableHtml(data, null);
     }
 
     function persist() {
@@ -522,16 +554,34 @@ function renderWorkspace(workspace, data) {
     function recompute(id) {
         const card = cards.get(id);
         const inputs = loadoutInputs(data, modulesByKey, state[id]);
-        const result = computeEffectiveChronoField(inputs);
-        const breakdown = computeLoadoutSubstatsBreakdown(modulesByKey, state[id].primaryKey, state[id].assistKey);
-        renderResult(card.querySelector('[data-cf-result]'), result, {
+        const before = computeEffectiveChronoField(inputs);
+        const beforeBreakdown = computeLoadoutSubstatsBreakdown(modulesByKey, state[id].primaryKey, state[id].assistKey);
+        const beforeBreakdownArgs = {
             levels: data.levels,
             efficiency: data.assistCoreEfficiency,
-            breakdown,
+            breakdown: beforeBreakdown,
             durationLabMaxed: data.durationLabMaxed,
             runPerkActive: inputs.runPerkActive,
             battleConditionActive: inputs.battleConditionActive,
-        });
+        };
+
+        let after = null;
+        let afterBreakdownArgs = null;
+        const appliedLoadout = appliedLoadoutContexts?.find((entry) => entry.id === id);
+        if (appliedPlan && appliedLoadout) {
+            const final = computeFinalLoadoutResult(appliedLoadout, appliedPlan, data);
+            after = final.result;
+            afterBreakdownArgs = {
+                levels: final.levels,
+                efficiency: final.efficiency,
+                breakdown: final.breakdown,
+                durationLabMaxed: appliedLoadout.durationLabMaxed,
+                runPerkActive: appliedLoadout.runPerkActive,
+                battleConditionActive: appliedLoadout.battleConditionActive,
+            };
+        }
+
+        renderResult(card.querySelector('[data-cf-result]'), before, after, afterBreakdownArgs || beforeBreakdownArgs);
     }
 
     function recomputeAll() {
@@ -541,10 +591,11 @@ function renderWorkspace(workspace, data) {
     // A module can be visible in both loadouts, so redraw every slot panel
     // whenever its locked/changeable state changes.
     function renderAllModuleSlots() {
+        const plannedByModule = buildPlannedByModule(appliedPlan);
         for (const id of LOADOUT_IDS) {
             const card = cards.get(id);
-            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), modulesByKey, state[id].primaryKey, lockOverrides);
-            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), modulesByKey, state[id].assistKey, lockOverrides);
+            renderModuleSlots(card.querySelector('[data-cf-primary-slots]'), modulesByKey, state[id].primaryKey, lockOverrides, plannedByModule);
+            renderModuleSlots(card.querySelector('[data-cf-assist-slots]'), modulesByKey, state[id].assistKey, lockOverrides, plannedByModule);
         }
     }
 
@@ -559,11 +610,16 @@ function renderWorkspace(workspace, data) {
             state[id].primaryKey = event.target.value;
             refreshWorkspace();
             persist();
+            // Which modules/slots are eligible can change the plan itself, not
+            // just the display — same reasoning as the perk/battle-condition
+            // toggles below, so re-run rather than leave a stale plan showing.
+            if (lastResult) runPlanner();
         });
         card.querySelector('[data-cf-assist]').addEventListener('change', (event) => {
             state[id].assistKey = event.target.value;
             refreshWorkspace();
             persist();
+            if (lastResult) runPlanner();
         });
     }
     refreshWorkspace();
@@ -577,6 +633,9 @@ function renderWorkspace(workspace, data) {
         lockOverrides.set(overrideKey, !currentlyLocked);
         renderAllModuleSlots();
         persist();
+        // Locking/unlocking a slot changes which slots the planner is even
+        // allowed to use, so a standing plan needs a fresh search too.
+        if (lastResult) runPlanner();
     });
 
     workspace.querySelector('[data-cf-run-perk]').addEventListener('change', (event) => {
@@ -731,13 +790,23 @@ function renderWorkspace(workspace, data) {
 
             if (candidates.length === 0) {
                 lastResult = null;
-                resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>';
+                appliedPlan = null;
+                appliedLoadoutContexts = null;
+                resultEl.innerHTML = '<p>No plan reaches that target on both loadouts, even using every available substat slot and maxing stone levels. Try a lower target.</p>'
+                    + renderInvestmentTableHtml(data, null);
+                refreshWorkspace();
                 return;
             }
 
             lastResult = candidates.reduce((best, candidate) => (
                 !best || candidate.plan.additionalCost < best.plan.additionalCost ? candidate : best
             ));
+            // Apply the winning plan to the loadout cards themselves — highlight
+            // the slots it picks and show each loadout's before/after stats —
+            // not just list it in the investment box below.
+            appliedPlan = lastResult.plan;
+            appliedLoadoutContexts = lastResult.loadoutContexts;
+            refreshWorkspace();
             renderPlanResult();
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
@@ -747,6 +816,33 @@ function renderWorkspace(workspace, data) {
     workspace.querySelector('[data-cf-planner-form]').addEventListener('submit', (event) => {
         event.preventDefault();
         runPlanner();
+    });
+
+    workspace.querySelector('[data-cf-reset]').addEventListener('click', () => {
+        // Back to exactly what the save file itself says: no lock overrides,
+        // no applied plan, and the save's own equipped modules/perk defaults —
+        // the same starting point as a fresh load with no stored prefs.
+        lockOverrides.clear();
+        appliedPlan = null;
+        appliedLoadoutContexts = null;
+        lastResult = null;
+
+        state.farming = { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, runPerkActive: true };
+        state.tournament = { primaryKey: defaultKeys.primaryKey, assistKey: defaultKeys.assistKey, battleConditionActive: true };
+
+        workspace.querySelector('#cf-farming-primary').value = state.farming.primaryKey;
+        workspace.querySelector('#cf-farming-assist').value = state.farming.assistKey;
+        workspace.querySelector('#cf-tournament-primary').value = state.tournament.primaryKey;
+        workspace.querySelector('#cf-tournament-assist').value = state.tournament.assistKey;
+        workspace.querySelector('[data-cf-run-perk]').checked = true;
+        workspace.querySelector('[data-cf-battle-condition]').checked = true;
+        // Target speed reduction, lab boost, and the assist-lab cap are planner
+        // preferences, not save-file state — reset leaves them as the player
+        // set them, rather than snapping back to their first-load defaults.
+
+        refreshWorkspace();
+        renderPlanResult();
+        persist();
     });
 }
 

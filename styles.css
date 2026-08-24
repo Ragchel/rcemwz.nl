@@ -1431,6 +1431,33 @@ code {
     font-weight: 700;
 }
 
+.cf-module-slot.is-planned {
+    align-items: start;
+    color: var(--ink);
+    background: #e4ead9;
+    outline: 2px solid var(--green-dark);
+    outline-offset: -2px;
+    font-weight: 700;
+}
+
+.cf-slot-arrow {
+    margin: 0 0.3em;
+    color: var(--muted);
+}
+
+.cf-slot-before {
+    color: var(--muted);
+    text-decoration: line-through;
+    font-weight: 500;
+}
+
+.cf-slot-after {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--green-dark);
+    font-weight: 700;
+}
+
 .cf-module-slot-label {
     min-width: 0;
 }
@@ -1530,24 +1557,57 @@ code {
 }
 
 .cf-planner h3 {
-    margin-top: 0;
+    margin: 0;
 }
 
 .cf-planner > p {
-    margin-top: -0.5rem;
+    margin-top: 0.35rem;
     color: var(--muted);
 }
 
-.cf-planner .cf-planner-note {
-    margin-top: 0.75rem;
-    color: var(--muted);
-    font-size: 0.8rem;
+.cf-reset-button {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    color: var(--pink-dark);
+    background: transparent;
+    border: 1px solid var(--pink-dark);
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 750;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.cf-reset-button:hover {
+    color: var(--white);
+    background: var(--pink-dark);
+}
+
+.cf-planner-row {
+    display: flex;
+    margin-top: 1.25rem;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 1.5rem;
+}
+
+.cf-planner-box {
+    padding: 1.1rem 1.25rem;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
 }
 
 .cf-planner-form {
     display: flex;
-    flex-wrap: wrap;
-    align-items: end;
+    flex: 1 1 320px;
+    flex-direction: column;
+    align-items: stretch;
     gap: 1rem;
 }
 
@@ -1556,10 +1616,17 @@ code {
 }
 
 .cf-planner-form input[type="number"] {
-    width: 8rem;
+    width: 100%;
 }
 
-.cf-planner-form button {
+.cf-planner-actions {
+    display: flex;
+    align-items: center;
+    margin-top: 0.25rem;
+    gap: 0.75rem;
+}
+
+.cf-planner-submit {
     min-height: 2.75rem;
     padding: 0.6rem 1.25rem;
     color: var(--white);
@@ -1574,12 +1641,60 @@ code {
     cursor: pointer;
 }
 
-.cf-planner-form button:hover {
+.cf-planner-submit:hover {
     background: var(--green);
 }
 
+.cf-investment-box {
+    flex: 1 1 260px;
+}
+
+.cf-investment-box h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+}
+
+.cf-investment-summary {
+    margin: 0.75rem 0 0;
+    color: var(--ink);
+}
+
+.cf-investment-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.cf-investment-table th,
+.cf-investment-table td {
+    padding: 0.35rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+}
+
+.cf-investment-table thead th {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.cf-investment-table thead th:first-child {
+    text-align: left;
+}
+
+.cf-investment-table tbody th {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.cf-investment-table tbody tr:last-child th,
+.cf-investment-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
 .cf-planner-result {
-    margin-top: 1.25rem;
     color: var(--ink);
 }
 
@@ -1784,15 +1899,6 @@ code {
 
     .cf-core-modules {
         grid-template-columns: 1fr;
-    }
-
-    .cf-planner-form {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .cf-planner-form input[type="number"] {
-        width: 100%;
     }
 }
 
