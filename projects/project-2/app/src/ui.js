@@ -552,11 +552,16 @@ function renderWorkspace(workspace, data) {
         state.farming.runPerkActive = event.target.checked;
         recompute('farming');
         persist();
+        // A displayed plan's "ends up at" figures and suggested levels can
+        // both depend on this, so keep it in sync rather than leaving it
+        // showing what the previous checkbox state would have produced.
+        if (lastResult) runPlanner();
     });
     workspace.querySelector('[data-cf-battle-condition]').addEventListener('change', (event) => {
         state.tournament.battleConditionActive = event.target.checked;
         recompute('tournament');
         persist();
+        if (lastResult) runPlanner();
     });
     // The save's own speed sources (Labs Speed lab level, relic bonus) plus
     // whatever the player enters for anything else (events, ...). Kept as a
@@ -586,8 +591,7 @@ function renderWorkspace(workspace, data) {
         renderPlanResult();
     });
 
-    workspace.querySelector('[data-cf-planner-form]').addEventListener('submit', (event) => {
-        event.preventDefault();
+    function runPlanner() {
         const resultEl = workspace.querySelector('[data-cf-planner-result]');
 
         try {
@@ -645,6 +649,11 @@ function renderWorkspace(workspace, data) {
         } catch (error) {
             resultEl.innerHTML = `<p>Could not plan an investment (${escapeHtml(error.message)}).</p>`;
         }
+    }
+
+    workspace.querySelector('[data-cf-planner-form]').addEventListener('submit', (event) => {
+        event.preventDefault();
+        runPlanner();
     });
 }
 
