@@ -1,0 +1,16 @@
+{
+  "name": "chrono-field-calculator",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --minify --alias:node:zlib=./src/node-zlib-shim.js --outfile=dist/calculator.js",
+    "test": "node test/calculator.test.js"
+  },
+  "dependencies": {
+    "pako": "^2.1.0",
+    "thetowersdk": "^0.5.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

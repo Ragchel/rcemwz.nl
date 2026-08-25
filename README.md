@@ -26,7 +26,7 @@ Each project's page and images are kept together so removing its directory also
 removes its content. Add the project preview images at:
 
 - `projects/project-1/images/preview.webp`
-- `projects/project-2/images/preview.webp`
+- `projects/project-2/images/preview.svg`
 - `projects/project-3/images/preview.webp`
 
 Other formats and filenames work too: update every matching `data-image` value.
