@@ -14,6 +14,7 @@
     --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --content: 1140px;
     --shadow: 0 24px 70px rgba(92, 53, 61, 0.12);
+    --project-width: min(calc(100% - 3rem), 1920px);
 }
 
 *,
@@ -657,7 +658,7 @@ code {
 }
 
 .project-detail-body {
-    width: min(calc(100% - 3rem), 960px);
+    width: var(--project-width);
     margin: 0 auto;
     padding: 0 0 clamp(5rem, 10vw, 9rem);
 }
@@ -714,7 +715,7 @@ code {
 .binder-introduction,
 .binder-notes {
     display: grid;
-    width: min(calc(100% - 3rem), 960px);
+    width: var(--project-width);
     margin: 0 auto;
     padding: clamp(4rem, 9vw, 8rem) 0;
     grid-template-columns: 1fr 1fr;
@@ -1140,6 +1141,76 @@ code {
     display: none;
 }
 
+.project-card-chrono .chrono-preview-art {
+    position: relative;
+    z-index: 1;
+    width: 58%;
+    aspect-ratio: 1;
+    background:
+        radial-gradient(circle, #eafcff 0 4%, transparent 5%),
+        radial-gradient(circle, #2c2358 0 42%, #8fd8ec 43% 45%, transparent 46%),
+        radial-gradient(circle, rgba(143, 123, 255, 0.42), transparent 68%);
+    border: 1px solid rgba(159, 224, 242, 0.45);
+    border-radius: 50%;
+    box-shadow: 0 0 2.5rem rgba(111, 214, 242, 0.4);
+}
+
+.project-card-chrono .chrono-preview-art::before,
+.project-card-chrono .chrono-preview-art::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 30%;
+    background: #eafcff;
+    border-radius: 999px;
+    content: "";
+    transform-origin: 50% 0;
+}
+
+.project-card-chrono .chrono-preview-art::before {
+    transform: rotate(135deg);
+}
+
+.project-card-chrono .chrono-preview-art::after {
+    height: 36%;
+    transform: rotate(70deg);
+}
+
+.chrono-preview-art i {
+    position: absolute;
+    width: 11%;
+    aspect-ratio: 1;
+    background: #bdf1ff;
+    border-radius: 35%;
+    box-shadow: 0 0 0.8rem currentcolor;
+    transform: rotate(45deg);
+}
+
+.chrono-preview-art i:nth-child(1) {
+    top: 12%;
+    right: -5%;
+    color: #6fd6f2;
+}
+
+.chrono-preview-art i:nth-child(2) {
+    right: 6%;
+    bottom: 3%;
+    color: #8f7bff;
+    background: #c8b6ff;
+}
+
+.chrono-preview-art i:nth-child(3) {
+    bottom: 12%;
+    left: -4%;
+    color: #dd8297;
+    background: #ffe3ea;
+}
+
+.project-card-chrono.has-image .chrono-preview-art {
+    display: none;
+}
+
 .site-footer {
     display: flex;
     width: min(calc(100% - 3rem), var(--content));
@@ -1158,9 +1229,519 @@ code {
     text-decoration: none;
 }
 
+/* Chrono Field calculator project */
+.cf-section {
+    width: var(--project-width);
+    margin: 0 auto;
+    padding: clamp(3rem, 7vw, 5rem) 0;
+    border-top: 1px solid var(--line);
+}
+
+.cf-section-heading {
+    display: flex;
+    margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+    align-items: end;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.cf-section-heading h2 {
+    font-size: clamp(2rem, 4vw, 2.6rem);
+}
+
+.cf-section-heading > p {
+    max-width: 26rem;
+    margin: 0 0 0.5rem;
+    color: var(--muted);
+}
+
+.cf-section-heading code {
+    font-family: var(--sans);
+    font-size: 0.9em;
+}
+
+.cf-panel {
+    display: flex;
+    padding: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 1.25rem;
+}
+
+.cf-file-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.cf-file-label span {
+    padding: 0.75rem 1.25rem;
+    color: var(--white);
+    background: var(--pink-dark);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.cf-file-label:hover span {
+    background: var(--pink);
+}
+
+.cf-file-label input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+}
+
+.cf-file-label:has(input:focus-visible) span {
+    outline: 3px solid var(--green-dark);
+    outline-offset: 4px;
+}
+
+.cf-status {
+    margin: 0;
+    color: var(--muted);
+}
+
+.cf-status.is-error {
+    color: var(--pink-dark);
+    font-weight: 700;
+}
+
+.cf-workspace {
+    display: grid;
+    margin-top: clamp(2rem, 5vw, 3rem);
+    gap: clamp(2rem, 5vw, 3rem);
+}
+
+.cf-loadouts {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.cf-loadout {
+    padding: 1.5rem;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.cf-loadout h3 {
+    margin-top: 0;
+    font-size: 1.3rem;
+}
+
+.cf-loadout-body {
+    display: grid;
+    margin-top: 1rem;
+    grid-template-columns: 2fr 1fr;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    align-items: start;
+}
+
+.cf-core-modules {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.cf-loadout-field {
+    display: block;
+}
+
+.cf-loadout-field + .cf-loadout-field {
+    margin-top: 1rem;
+}
+
+.cf-core-modules .cf-loadout-field + .cf-loadout-field {
+    margin-top: 0;
+}
+
+.cf-loadout-field label {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.cf-loadout-field select,
+.cf-loadout-field input[type="number"] {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.8rem;
+    color: var(--ink);
+    background: var(--paper-deep);
+    border: 1px solid var(--line);
+    border-radius: 0.7rem;
+    font: inherit;
+}
+
+.cf-module-slots-wrap {
+    margin-top: 0.6rem;
+}
+
+.cf-module-slots-empty {
+    margin: 0.6rem 0 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.cf-module-slots {
+    display: grid;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    gap: 0.3rem;
+    list-style: none;
+}
+
+.cf-module-slot {
+    display: flex;
+    padding: 0.4rem 0.5rem 0.4rem 0.6rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--muted);
+    background: var(--paper-deep);
+    border-radius: 0.6rem;
+    font-size: 0.8rem;
+}
+
+.cf-module-slot.is-empty {
+    font-style: italic;
+    background: transparent;
+    border: 1px dashed var(--line);
+}
+
+.cf-module-slot.is-cf {
+    color: var(--ink);
+    background: var(--blush);
+    font-weight: 700;
+}
+
+.cf-module-slot.is-planned {
+    align-items: start;
+    color: var(--ink);
+    background: #e4ead9;
+    outline: 2px solid var(--green-dark);
+    outline-offset: -2px;
+    font-weight: 700;
+}
+
+.cf-slot-arrow {
+    margin: 0 0.3em;
+    color: var(--muted);
+}
+
+.cf-slot-before {
+    color: var(--muted);
+    text-decoration: line-through;
+    font-weight: 500;
+}
+
+.cf-slot-after {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--green-dark);
+    font-weight: 700;
+}
+
+.cf-module-slot-label {
+    min-width: 0;
+}
+
+.cf-module-slot-toggle {
+    flex-shrink: 0;
+    padding: 0.25rem 0.7rem;
+    color: var(--muted);
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.cf-module-slot-toggle:hover {
+    border-color: var(--pink);
+}
+
+.cf-module-slot-toggle[aria-pressed="true"] {
+    color: var(--white);
+    background: var(--pink-dark);
+    border-color: var(--pink-dark);
+}
+
+.cf-module-slot-toggle[aria-pressed="false"] {
+    color: var(--green-dark);
+    background: #e4ead9;
+    border-color: transparent;
+}
+
+.cf-loadout-toggle {
+    display: flex;
+    margin-top: 1rem;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.cf-loadout-toggle label {
+    margin: 0;
+    color: var(--ink);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.cf-loadout-side {
+    padding-left: clamp(1.5rem, 3vw, 2.5rem);
+    border-left: 1px solid var(--line);
+}
+
+.cf-result-status {
+    display: inline-flex;
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.cf-result-status.is-reached {
+    color: var(--green-dark);
+    background: #e4ead9;
+}
+
+.cf-result-status.is-short {
+    color: var(--pink-dark);
+    background: var(--blush);
+}
+
+.cf-result dl {
+    display: grid;
+    margin: 1rem 0 0;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 1rem;
+}
+
+.cf-result dt {
+    color: var(--muted);
+}
+
+.cf-result dd {
+    margin: 0;
+    font-weight: 700;
+}
+
+.cf-planner {
+    padding: 1.5rem;
+    background: var(--paper-deep);
+    border-radius: 1.25rem;
+}
+
+.cf-planner h3 {
+    margin: 0;
+}
+
+.cf-planner > p {
+    margin-top: 0.35rem;
+    color: var(--muted);
+}
+
+.cf-reset-button {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    color: var(--pink-dark);
+    background: transparent;
+    border: 1px solid var(--pink-dark);
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 750;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.cf-reset-button:hover {
+    color: var(--white);
+    background: var(--pink-dark);
+}
+
+.cf-planner-row {
+    display: flex;
+    margin-top: 1.25rem;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 1.5rem;
+}
+
+.cf-planner-box {
+    padding: 1.1rem 1.25rem;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+}
+
+.cf-planner-form {
+    display: flex;
+    flex: 1 1 320px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+}
+
+.cf-planner-form .cf-loadout-field {
+    margin-top: 0;
+}
+
+.cf-planner-form input[type="number"] {
+    width: 100%;
+}
+
+.cf-planner-actions {
+    display: flex;
+    align-items: center;
+    margin-top: 0.25rem;
+    gap: 0.75rem;
+}
+
+.cf-planner-submit {
+    min-height: 2.75rem;
+    padding: 0.6rem 1.25rem;
+    color: var(--white);
+    background: var(--green-dark);
+    border: none;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.cf-planner-submit:hover {
+    background: var(--green);
+}
+
+.cf-investment-box {
+    flex: 1 1 260px;
+}
+
+.cf-investment-box h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+}
+
+.cf-investment-summary {
+    margin: 0.75rem 0 0;
+    color: var(--ink);
+}
+
+.cf-investment-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.cf-investment-table th,
+.cf-investment-table td {
+    padding: 0.35rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+}
+
+.cf-investment-table thead th {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.cf-investment-table thead th:first-child {
+    text-align: left;
+}
+
+.cf-investment-table tbody th {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.cf-investment-table tbody tr:last-child th,
+.cf-investment-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.cf-planner-result {
+    color: var(--ink);
+}
+
+.cf-planner-result ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.2rem;
+}
+
+.cf-breakdown {
+    margin-top: 0.6rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.cf-breakdown summary {
+    cursor: pointer;
+}
+
+.cf-breakdown ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.2rem;
+}
+
+.cf-message {
+    padding: 1rem;
+    color: var(--ink);
+    background: var(--blush);
+    border-radius: 0.75rem;
+}
+
 @keyframes drift {
     0%, 100% { transform: translate(0, 0) rotate(45deg); }
     50% { transform: translate(1.2rem, 1.8rem) rotate(115deg); }
+}
+
+@media (max-width: 900px) {
+    .cf-loadout-body {
+        grid-template-columns: 1fr;
+    }
+
+    .cf-loadout-side {
+        margin-top: 1.25rem;
+        padding-top: 1.25rem;
+        padding-left: 0;
+        border-top: 1px solid var(--line);
+        border-left: none;
+    }
 }
 
 @media (max-width: 760px) {
@@ -1314,6 +1895,10 @@ code {
 
     .site-footer p {
         margin: 0;
+    }
+
+    .cf-core-modules {
+        grid-template-columns: 1fr;
     }
 }
 
