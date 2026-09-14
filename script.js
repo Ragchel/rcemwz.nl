@@ -1,5 +1,10 @@
 document.documentElement.classList.add('js');
 
+if (window.location.pathname.endsWith('/index.html')) {
+    const cleanPath = window.location.pathname.slice(0, -'index.html'.length);
+    window.history.replaceState(null, '', `${cleanPath}${window.location.search}${window.location.hash}`);
+}
+
 const menuButton = document.querySelector('.menu-toggle');
 const navigation = document.querySelector('.site-navigation');
 

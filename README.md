@@ -25,8 +25,8 @@ expects the about image at:
 Each project's page and images are kept together so removing its directory also
 removes its content. Add the project preview images at:
 
-- `projects/project-1/images/preview.webp`
-- `projects/project-2/images/preview.svg`
+- `projects/pokemon-tcg-binder/images/preview.webp`
+- `projects/PCF/images/preview.svg`
 - `projects/project-3/images/preview.webp`
 
 Other formats and filenames work too: update every matching `data-image` value.
@@ -38,8 +38,8 @@ slots, while a portrait or square image suits the about section.
 
 The project overview is in `projects/index.html`. The initial detail pages are:
 
-- `projects/project-1/index.html`
-- `projects/project-2/index.html`
+- `projects/pokemon-tcg-binder/index.html`
+- `projects/PCF/index.html`
 - `projects/project-3/index.html`
 
 Each page contains comments beside the temporary title and copy that should be
@@ -48,7 +48,7 @@ live in or reference that project's own folder.
 
 ### Update the Pokémon binder
 
-Project 01 is an interactive 1,088-pocket Pokémon TCG binder. Add WebP card images
-to `projects/project-1/images/cards/` using the pocket number as the filename:
+The Pokémon TCG binder is an interactive 1,088-pocket collection. Add WebP card
+images to `projects/pokemon-tcg-binder/images/cards/` using the pocket number as the filename:
 `card-1.webp`, `card-2.webp`, `card-3.webp`, and so on. No HTML or JavaScript edit
-is needed. See `projects/project-1/images/README.md` for the pocket order.
+is needed. See `projects/pokemon-tcg-binder/images/README.md` for the pocket order.
