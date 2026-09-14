@@ -41,6 +41,14 @@ Write in a first-person, conversational voice. Be honest about unfinished experi
 
 Protect privacy. Before exposing repository URLs, email addresses, analytics, personal metadata, or details about private projects, confirm that the information is already intentionally public or was explicitly supplied for publication. Never commit secrets or credentials.
 
+### Project 3: Nuzlocke journal
+
+- `projects/project-3/` is the homepage and archive for Rachel's Pokémon Nuzlocke journey.
+- Every Nuzlocke attempt gets its own page beneath `projects/project-3/games/`, including failed attempts and victories.
+- Replaying the same Pokémon title counts as a separate game/run for this journal. Never merge a rerun into an earlier attempt; give it a unique page and run number.
+- A run page should record catches (optionally with Pokémon images), encounter locations, notable journey moments, the ruleset, current status, and final outcome when known.
+- Do not invent catches, dates, results, nicknames, rules, or story details. Leave clear placeholders until Rachel supplies them.
+
 ## Engineering guidelines
 
 - First inspect the existing implementation and follow its established patterns.
