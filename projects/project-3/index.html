@@ -3,12 +3,12 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="Project 03 by Rachel.">
+        <meta name="description" content="Rachel's Pokémon Nuzlocke journal, collecting every victory, wipe, catch, and memorable moment.">
         <meta name="theme-color" content="#fffaf7">
         <link rel="icon" href="/assets/images/favicon.svg" type="image/svg+xml">
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="apple-touch-icon" href="/assets/images/apple-touch-icon.png">
-        <title>Project 03 — rcemwz</title>
+        <title>Nuzlocke journal — rcemwz</title>
         <link rel="stylesheet" href="../../styles.css">
         <script src="../../script.js" defer></script>
     </head>
@@ -25,36 +25,40 @@
             </nav>
         </header>
 
-        <main id="main-content" class="project-detail">
-            <article>
-                <header class="project-detail-hero">
-                    <p class="eyebrow">Project 03</p>
-                    <h1>Project three</h1>
-                    <p class="hero-intro">Project details will be added here.</p>
-                    <!-- Replace the temporary title and introduction above. -->
-                </header>
+        <main id="main-content" class="project-detail nuzlocke-journal">
+            <header class="project-detail-hero nuzlocke-hero">
+                <div class="nuzlocke-mark" aria-hidden="true"><span></span></div>
+                <p class="eyebrow">Pokémon · every attempt counts</p>
+                <h1>Nuzlocke<br>journal</h1>
+                <p class="hero-intro">A home for every close call, fallen teammate, lucky catch, wipe, and hard-earned victory along the way.</p>
+                <a class="text-link" href="#games">Browse the games <span aria-hidden="true">↓</span></a>
+            </header>
 
-                <div class="project-detail-body">
-                    <figure class="image-slot project-detail-image" data-image="images/preview.webp" data-alt="Third project preview">
-                        <!-- Uses the preview stored in this project's images folder. -->
-                    </figure>
-
-                    <div class="project-notes">
-                        <section aria-labelledby="story-title">
-                            <p class="eyebrow">The story</p>
-                            <h2 id="story-title">Why I made it</h2>
-                            <p>Notes about the idea, motivation, and what made this project fun will go here.</p>
-                        </section>
-                        <section aria-labelledby="details-title">
-                            <p class="eyebrow">The details</p>
-                            <h2 id="details-title">How it came together</h2>
-                            <p>Notes about the process, tools, current status, and useful project links will go here.</p>
-                        </section>
-                    </div>
-                    <!-- Replace the clearly marked temporary project notes above; do not publish private links or details. -->
-                    <a class="project-back" href="/projects/"><span aria-hidden="true">←&nbsp;</span> All projects</a>
+            <section class="nuzlocke-intro" aria-labelledby="journal-about-title">
+                <div><p class="eyebrow">The journey</p><h2 id="journal-about-title">One run at a time</h2></div>
+                <div>
+                    <p>Each game gets its own page, following the run from the first partner to the final battle—or the moment the team falls. I’ll keep track of catches and where I found them, alongside the small stories that made each attempt memorable.</p>
+                    <p>If I return to the same Pokémon title for another try, that rerun becomes a new journal entry of its own. A familiar region can still tell a completely different story.</p>
                 </div>
-            </article>
+            </section>
+
+            <section id="games" class="nuzlocke-games" aria-labelledby="games-title">
+                <div class="nuzlocke-section-heading">
+                    <div><p class="eyebrow">Run archive</p><h2 id="games-title">The games</h2></div>
+                    <p>Victories and failed attempts both belong here.</p>
+                </div>
+                <div class="encounter-grid">
+                    <article class="run-ending">
+                        <p class="eyebrow">Run 1 · In progress</p>
+                        <h3>Pokémon Black</h3>
+                        <p>Ella’s journey with Sage the Snivy and Piper the Lillipup. Our first session ended with a victory over N and his Purrloin.</p>
+                        <p>Started <time datetime="2026-09-14">14 September 2026</time> · 30 minutes played</p>
+                        <a class="text-link" href="games/black-run-1/">Read Ella’s journey <span aria-hidden="true">→</span></a>
+                    </article>
+                </div>
+            </section>
+
+            <div class="project-detail-body nuzlocke-back-wrap"><a class="project-back" href="/projects/"><span aria-hidden="true">←&nbsp;</span> All projects</a></div>
         </main>
 
         <footer class="site-footer">

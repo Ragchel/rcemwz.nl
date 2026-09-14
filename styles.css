@@ -695,6 +695,53 @@ code {
     text-transform: uppercase;
 }
 
+/* Nuzlocke journal */
+.nuzlocke-hero { padding-bottom: clamp(5rem, 10vw, 8rem); background: radial-gradient(circle at 76% 28%, rgba(245, 215, 220, .95), transparent 25%), radial-gradient(circle at 17% 78%, rgba(220, 229, 214, .8), transparent 22%), linear-gradient(145deg, #fffdf9, var(--paper-deep)); }
+.nuzlocke-mark, .nuzlocke-empty-ball, .nuzlocke-preview-ball { position: relative; display: grid; aspect-ratio: 1; place-items: center; overflow: hidden; background: linear-gradient(to bottom, var(--pink) 0 46%, var(--ink) 46% 54%, var(--white) 54%); border: 3px solid var(--ink); border-radius: 50%; box-shadow: 0 12px 30px rgba(92, 53, 61, .16); }
+.nuzlocke-mark { width: 4.75rem; margin: 0 auto 2rem; }
+.nuzlocke-mark span, .nuzlocke-empty-ball span, .nuzlocke-preview-ball i { z-index: 1; width: 28%; aspect-ratio: 1; background: var(--paper); border: 3px solid var(--ink); border-radius: 50%; }
+.nuzlocke-intro, .nuzlocke-games, .nuzlocke-run-body { width: var(--project-width); margin: 0 auto; }
+.nuzlocke-intro { display: grid; padding: clamp(4rem, 9vw, 8rem) 0; grid-template-columns: .8fr 1.2fr; gap: clamp(2rem, 8vw, 7rem); }
+.nuzlocke-intro h2, .nuzlocke-games h2, .nuzlocke-run-body h2 { font-size: clamp(2.4rem, 5vw, 4rem); }
+.nuzlocke-intro p { margin-top: 0; color: var(--muted); }
+.nuzlocke-games { padding: clamp(4rem, 8vw, 7rem) 0; border-top: 1px solid var(--line); }
+.nuzlocke-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 3rem; }
+.nuzlocke-section-heading > p { max-width: 24rem; margin: 0; color: var(--muted); text-align: right; }
+.nuzlocke-empty { padding: clamp(3rem, 8vw, 6rem) 1.5rem; text-align: center; background: rgba(255,255,255,.5); border: 1px dashed var(--line); border-radius: 1.5rem; }
+.nuzlocke-empty-ball { width: 3.5rem; margin: 0 auto 1.5rem; border-width: 2px; }
+.nuzlocke-empty-ball span { border-width: 2px; }
+.nuzlocke-empty h3 { margin: 0; font-family: var(--serif); font-size: clamp(1.8rem, 4vw, 2.7rem); font-weight: 400; }
+.nuzlocke-empty > p:last-child { max-width: 36rem; margin: 1rem auto 0; color: var(--muted); }
+.nuzlocke-back-wrap { padding-top: 0; }
+.nuzlocke-preview { background: radial-gradient(circle at 50% 45%, #fff 0 12%, transparent 12%), linear-gradient(145deg, #f8d4da, #edf1e9); }
+.nuzlocke-preview-ball { width: min(45%, 9rem); border-width: 4px; transform: rotate(-8deg); }
+.nuzlocke-preview-ball i { display: block; border-width: 4px; }
+.project-preview .nuzlocke-preview-ball i,
+.project-preview:hover .nuzlocke-preview-ball i { transform: none; transition: none; }
+.nuzlocke-run-hero { padding-bottom: 5rem; }
+.run-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: 2.5rem; }
+.run-meta span { padding: .6rem .9rem; color: var(--muted); background: rgba(255,255,255,.65); border: 1px solid var(--line); border-radius: 999px; font-size: .82rem; }
+.run-meta strong { color: var(--ink); }
+.nuzlocke-run-body { padding: clamp(4rem, 9vw, 8rem) 0; }
+.nuzlocke-run-body > section + section { margin-top: clamp(4rem, 9vw, 8rem); }
+.journey-log { margin-top: 2rem; padding-left: 2rem; border-left: 2px solid var(--line); }
+.journey-entry { position: relative; max-width: 48rem; padding: 0 0 2rem 1rem; }
+.journey-entry::before { position: absolute; top: .55rem; left: -2.48rem; width: .8rem; aspect-ratio: 1; background: var(--pink); border: 3px solid var(--paper); border-radius: 50%; box-shadow: 0 0 0 1px var(--pink-dark); content: ""; }
+.journey-location, .encounter-place { margin: 0; color: var(--pink-dark); font-size: .75rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.journey-entry h3, .encounter-card h3 { margin: .25rem 0; font-family: var(--serif); font-size: 1.7rem; font-weight: 400; }
+.journey-entry > p:last-child, .encounter-card p:last-child, .run-ending > p:last-child { color: var(--muted); }
+.encounter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 2rem; }
+.encounter-card { display: grid; padding: 1rem; grid-template-columns: 6rem 1fr; align-items: center; gap: 1.25rem; background: rgba(255,255,255,.55); border: 1px solid var(--line); border-radius: 1.25rem; }
+.pokemon-portrait { display: grid; width: 6rem; aspect-ratio: 1; margin: 0; place-items: center; overflow: hidden; color: var(--pink-dark); background: var(--paper-deep); border-radius: 50%; font-family: var(--serif); font-size: 2rem; }
+.pokemon-portrait img { width: 100%; height: 100%; padding: .4rem; object-fit: contain; }
+.journey-entry--with-pokemon { display: grid; grid-template-columns: clamp(3.5rem, 16vw, 7.5rem) minmax(0, 1fr); align-items: start; gap: clamp(.75rem, 2vw, 1.5rem); }
+.journey-heading { grid-column: 1 / -1; }
+.journey-pokemon { display: block; width: 120px; max-width: 100%; height: auto; margin: 0; object-fit: contain; }
+.journey-copy { min-width: 0; overflow-wrap: anywhere; }
+.journey-copy > p:last-child { margin-bottom: 0; color: var(--muted); }
+.encounter-card p { margin: 0; }
+.run-ending { padding: clamp(2rem, 5vw, 4rem); background: linear-gradient(135deg, var(--paper-deep), rgba(220,229,214,.65)); border-radius: 1.5rem; }
+
 /* Pokémon binder project */
 .binder-hero {
     padding-bottom: clamp(5rem, 10vw, 8rem);
@@ -1835,6 +1882,12 @@ code {
     .project-notes {
         grid-template-columns: 1fr;
     }
+
+    .nuzlocke-intro,
+    .encounter-grid { grid-template-columns: 1fr; }
+
+    .nuzlocke-section-heading { align-items: flex-start; flex-direction: column; }
+    .nuzlocke-section-heading > p { text-align: left; }
 
     .image-slot {
         min-height: 340px;
