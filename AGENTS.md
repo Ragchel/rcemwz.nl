@@ -43,8 +43,8 @@ Protect privacy. Before exposing repository URLs, email addresses, analytics, pe
 
 ### Project 3: Nuzlocke journal
 
-- `projects/project-3/` is the homepage and archive for Rachel's Pokémon Nuzlocke journey.
-- Every Nuzlocke attempt gets its own page beneath `projects/project-3/games/`, including failed attempts and victories.
+- `projects/pokemon-nuzlocke/` is the homepage and archive for Rachel's Pokémon Nuzlocke journey.
+- Every Nuzlocke attempt gets its own page beneath `projects/pokemon-nuzlocke/games/`, including failed attempts and victories.
 - Replaying the same Pokémon title counts as a separate game/run for this journal. Never merge a rerun into an earlier attempt; give it a unique page and run number.
 - A run page should record catches (optionally with Pokémon images), encounter locations, notable journey moments, the ruleset, current status, and final outcome when known.
 - Record each run's type explicitly as Nuzlocke, Shinylocke, or both on its page and archive card. Do not infer the type from the Pokémon caught. Pokémon Black run 1 is Nuzlocke only.
