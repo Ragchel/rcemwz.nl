@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="A browser-based orbit plotter for The Tower's Sentry Protocol module, by Rachel.">
+        <meta name="theme-color" content="#fffaf7">
+        <link rel="icon" href="/assets/images/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="apple-touch-icon" href="/assets/images/apple-touch-icon.png">
+        <title>Orbit Plotter — rcemwz</title>
+        <link rel="stylesheet" href="../../styles.css">
+        <script src="../../script.js" defer></script>
+        <script src="app/nrbf-reader.js?v=1" defer></script>
+        <script src="app/nrbf-to-json.js?v=1" defer></script>
+        <script src="app/tower-sentry.js?v=1" defer></script>
+    </head>
+    <body>
+        <a class="skip-link" href="#main-content">Skip to the main content</a>
+
+        <header class="site-header">
+            <a class="site-logo" href="/" aria-label="rcemwz, return to the homepage"><span aria-hidden="true">✿</span> rcemwz</a>
+            <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+                <span class="visually-hidden">Open navigation</span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+            </button>
+            <nav id="site-navigation" class="site-navigation" aria-label="Main navigation">
+                <a href="/">Home</a><a href="/#about">About</a><a href="/projects/" aria-current="page">Projects</a>
+            </nav>
+        </header>
+
+        <main id="main-content" class="project-detail">
+            <article>
+                <header class="project-detail-hero">
+                    <p class="eyebrow">Sentry Protocol · The Tower</p>
+                    <h1>Orbit<br>Plotter</h1>
+                    <p class="hero-intro">Plot your Tower's orb rings, Sentry Protocol coverage bands, and range references from your own save — load it, pick a preset, or drag a ring by hand.</p>
+                    <a class="text-link" href="#calculator">Open the plotter <span aria-hidden="true">↓</span></a>
+                </header>
+
+                <div class="project-detail-body">
+                    <figure class="image-slot project-detail-image" data-image="images/preview.svg" data-alt="A tower silhouette at the center of glowing concentric orbit rings, with small orbs and mines in orbit">
+                        <!-- Uses the preview stored in this project's images folder. -->
+                    </figure>
+
+                    <div class="project-notes">
+                        <section aria-labelledby="story-title">
+                            <p class="eyebrow">The story</p>
+                            <h2 id="story-title">Why I made it</h2>
+                            <p>The game never actually tells you the target range of Sentry Protocol's mini-orbs — you just have to guess how close an enemy needs to be. I built this to plot the real rings against a loaded save, so I could actually see the targeting radius instead of guessing at it.</p>
+                        </section>
+                        <section aria-labelledby="details-title">
+                            <p class="eyebrow">The details</p>
+                            <h2 id="details-title">How it came together</h2>
+                            <p>Reads a <code>playerInfo.dat</code> save file straight in the browser — nothing leaves your device. Orbit radii, coverage gaps, and reference distances come from reverse-engineered game math, checked against the game's own compiled code wherever possible; anything still estimated is flagged as such. Full derivations live in <a href="methodology.md" class="text-link"><span>methodology.md</span></a>.</p>
+                        </section>
+                    </div>
+                </div>
+
+                <section id="calculator" class="tsp-section" aria-labelledby="calculator-title" data-tsp-tool>
+                    <div class="tsp-section-heading">
+                        <div>
+                            <p class="eyebrow">Load your save</p>
+                            <h2 id="calculator-title">Orbit plotter</h2>
+                        </div>
+                        <p>Choose your <code>playerInfo.dat</code> file, pick a preset, and see your Workshop and Card orbit rings, Sentry Protocol coverage, and reference distances plotted to scale.</p>
+                    </div>
+
+                    <div class="tsp-wrap">
+                        <div class="tsp-board">
+                            <div class="tsp-board-svg-frame">
+                                <svg id="rings" viewBox="0 0 640 640" role="img" aria-label="Orbit plotting board"></svg>
+                            </div>
+                            <div class="tsp-legend" id="legend"></div>
+                            <div class="tsp-readout">
+                                <h3>Readout</h3>
+                                <div class="readout-grid" id="readoutGrid"></div>
+                            </div>
+                        </div>
+
+                        <div class="tsp-panel">
+
+                            <div class="tsp-panel-section">
+                                <h3>Tower data <span class="tag confirmed">from save</span></h3>
+
+                                <div class="loader-row">
+                                    <label class="file-btn" for="fileInput">Load save file (.dat)</label>
+                                    <input type="file" id="fileInput" accept=".dat">
+                                    <span class="load-status" id="loadStatus">No save loaded — fields below are manual.</span>
+                                </div>
+
+                                <div class="select-row">
+                                    <label for="presetSelect">Save preset</label>
+                                    <select id="presetSelect" disabled>
+                                        <option>Load a save to list presets</option>
+                                    </select>
+                                </div>
+
+                                <hr class="tsp-divider">
+
+                                <div class="field-row">
+                                    <label for="labLevel">Range lab level</label>
+                                    <input type="number" id="labLevel" value="70" min="0" max="80">
+                                </div>
+                                <div class="field-row">
+                                    <label for="wsLevel">Range workshop level</label>
+                                    <input type="number" id="wsLevel" value="79" min="0" max="79">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="cardActive" checked>
+                                    <label for="cardActive">Range card equipped in preset</label>
+                                </div>
+                                <div class="field-row">
+                                    <label for="cardLevel">Range card level</label>
+                                    <input type="number" id="cardLevel" value="7" min="1" max="99">
+                                </div>
+                                <div id="midBattleWrap">
+                                    <div class="checkline">
+                                        <input type="checkbox" id="midBattle">
+                                        <label for="midBattle">Mid-battle (use in-round Range buys instead of workshop level)</label>
+                                    </div>
+                                    <div class="field-row">
+                                        <label for="battleLevel">In-round Range buys<span class="hint">Main.upgradeLevel[4] — resets to 0 each battle</span></label>
+                                        <input type="number" id="battleLevel" value="0" min="0" max="999">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tsp-panel-section">
+                                <h3>Orbs</h3>
+                                <div class="field-row">
+                                    <label for="wsOrbLevel">Workshop level</label>
+                                    <input type="number" id="wsOrbLevel" value="4" min="0" max="4">
+                                </div>
+                                <div class="field-row">
+                                    <label for="orbPerk">Orb Perk (stacks)<span class="hint">picked up to twice in-round, +1 orb per pick</span></label>
+                                    <input type="number" id="orbPerk" value="0" min="0" max="2">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="primaryArmorOrbs" disabled>
+                                    <label for="primaryArmorOrbs">Primary Armor Orbs substat <span class="hint" style="display:inline;margin-left:4px;">+2</span></label>
+                                </div>
+                                <div class="field-row">
+                                    <label for="assistArmorOrbsEff">Assist Armor Orbs substat efficiency</label>
+                                    <input type="number" id="assistArmorOrbsEff" value="0" min="0" max="100" step="1">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="vaultOrbNode" disabled>
+                                    <label for="vaultOrbNode">Vault "Orbs" node (VaultID.OrbsCount) <span class="hint" style="display:inline;margin-left:4px;">+1</span></label>
+                                </div>
+                                <div class="rblock brass" style="margin-top:6px;">
+                                    <div class="label">Total workshop orbs</div>
+                                    <div class="value" id="wsOrbTotal">4</div>
+                                </div>
+                                <hr class="tsp-divider">
+                                <div class="checkline">
+                                    <input type="checkbox" id="wsAdjuster">
+                                    <label for="wsAdjuster">Workshop Orb Adjuster owned (Vault)</label>
+                                </div>
+                                <div class="slider-row">
+                                    <div class="slider-head"><span class="name">Ring position</span><span class="val" id="wsStepVal">floor</span></div>
+                                    <input type="range" id="wsStep" min="0" max="10" value="0" step="1">
+                                    <div class="locked-note" id="wsLockNote"></div>
+                                </div>
+                            </div>
+
+                            <div class="tsp-panel-section ring-cyan">
+                                <h3>Card orbit</h3>
+                                <div class="field-row">
+                                    <label for="cardOrbCount">Card / extra orb count</label>
+                                    <input type="number" id="cardOrbCount" value="3" min="0" max="20">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="syncSteps">
+                                    <label for="syncSteps">Sync ring position with Workshop orbit</label>
+                                </div>
+                                <div class="slider-row">
+                                    <div class="slider-head"><span class="name">Ring position</span><span class="val" id="cardStepVal">floor</span></div>
+                                    <input type="range" id="cardStep" min="0" max="10" value="0" step="1">
+                                </div>
+                                <div class="presets" id="presets"></div>
+                            </div>
+
+                            <div class="tsp-panel-section">
+                                <h3>Armor modules</h3>
+                                <div class="select-row">
+                                    <select id="modulePrimarySelect" disabled>
+                                        <option>Load a save to list your Armor modules</option>
+                                    </select>
+                                </div>
+                                <div id="modDetailPrimary"><div class="mod-empty">Load a save to inspect a module.</div></div>
+
+                                <div id="assistModuleWrap" style="display:none;">
+                                    <hr class="tsp-divider">
+                                    <div class="select-row">
+                                        <select id="moduleAssistSelect" disabled>
+                                            <option>Load a save to list your Armor modules</option>
+                                        </select>
+                                    </div>
+                                    <div id="modDetailAssist"><div class="mod-empty">Load a save to inspect a module.</div></div>
+                                </div>
+                            </div>
+
+                            <div class="tsp-panel-section">
+                                <h3>Reference lines <span class="tag confirmed">from save/code</span></h3>
+                                <div class="checkline">
+                                    <input type="checkbox" id="showWall" checked>
+                                    <label for="showWall">Show Wall line (1.3m, fixed)</label>
+                                </div>
+                                <hr class="tsp-divider">
+                                <div class="field-row">
+                                    <label for="modMineRadius">+ Land Mine Radius from modules</label>
+                                    <input type="number" id="modMineRadius" value="0" min="0" step="0.01">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="showMineRadius" checked>
+                                    <label for="showMineRadius">Show Inner Land Mine orbit (real mine ring, not blast radius)</label>
+                                </div>
+                                <div class="field-row">
+                                    <label for="innerLandMineCount">Inner land mine count<span class="hint">Auto-filled from save (ultimateWeaponLevel[13], Main.GetInnerLandMineQuantity()'s formula) when loaded - editable, default is the formula's base of 3</span></label>
+                                    <input type="number" id="innerLandMineCount" value="3" min="0" max="40" step="1">
+                                </div>
+                                <div class="field-row">
+                                    <label for="modMineCount">+ Inner Land Mine count from modules<span class="hint">Auto-filled from equipped Core modules' "Inner Land Mines - Quantity" substat (+1/+2/+3 at Legendary/Mythic/Ancestral) - editable</span></label>
+                                    <input type="number" id="modMineCount" value="0" min="0" max="6" step="1">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="extraSetPerk">
+                                    <label for="extraSetPerk">Extra Set of Inner Mines perk active<span class="hint">picked at most once in-round, +6 mines on their own farther-out ring - no save field (in-round-only, like the other Perks)</span></label>
+                                </div>
+                                <button type="button" class="preset" id="snapMineBtn" style="margin-top:2px;">Snap Card ring to blast radius</button>
+                                <hr class="tsp-divider">
+                                <div class="checkline">
+                                    <input type="checkbox" id="showSpaceDisplacer" disabled>
+                                    <label for="showSpaceDisplacer">Show Space Displacer mine orbit</label>
+                                </div>
+                                <div class="field-row">
+                                    <label for="spaceDisplacerMineCount">Currently-orbiting mine count (cap 20)</label>
+                                    <input type="number" id="spaceDisplacerMineCount" value="20" min="0" max="20" step="1">
+                                </div>
+                                <hr class="tsp-divider">
+                                <div class="checkline">
+                                    <input type="checkbox" id="showRangedStandoff" checked>
+                                    <label for="showRangedStandoff">Show Ranged enemy line</label>
+                                </div>
+                                <div class="field-row">
+                                    <label for="rangedRangeLabLevel">Ranged Enemy Range lab level</label>
+                                    <input type="number" id="rangedRangeLabLevel" value="0" min="0" max="30">
+                                </div>
+                                <div class="field-row">
+                                    <label for="rangedRangeVaultPct">Vault Ranged Range Distance reduction %</label>
+                                    <input type="number" id="rangedRangeVaultPct" value="0" min="0" max="100" step="1">
+                                </div>
+                                <div class="checkline">
+                                    <input type="checkbox" id="rangedEnemyPerkActive">
+                                    <label for="rangedEnemyPerkActive">Ranged Enemy Perk active (Trade-Off #44: switches to the "near" radius, damage ×3)</label>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <p class="tsp-foot-note">
+                        The save loader runs entirely in your browser — the file never leaves this page. 1 internal unit = 10 displayed meters. Full derivations and confirmed-vs-estimated notes: see <a href="methodology.md" class="text-link" target="_blank"><span>methodology.md</span></a>.
+                    </p>
+
+                    <noscript>
+                        <p class="tsp-message">JavaScript is needed to run the orbit plotter. The rest of this project page remains available without it.</p>
+                    </noscript>
+                </section>
+
+                <div class="project-detail-body">
+                    <a class="project-back" href="/projects/"><span aria-hidden="true">←&nbsp;</span> All projects</a>
+                </div>
+            </article>
+        </main>
+
+        <footer class="site-footer">
+            <p>© 2026 rcemwz <span aria-hidden="true">·</span> Made with care and a few cherry blossoms.</p>
+            <a href="/projects/">All projects <span aria-hidden="true">→</span></a>
+        </footer>
+    </body>
+</html>

@@ -28,6 +28,7 @@ removes its content. Add the project preview images at:
 - `projects/pokemon-tcg-binder/images/preview.webp`
 - `projects/PCF/images/preview.svg`
 - `projects/pokemon-nuzlocke/images/preview.webp`
+- `projects/tower-sentry-protocol/images/preview.svg`
 
 Other formats and filenames work too: update every matching `data-image` value.
 Update `data-alt` at the same time so the image is described clearly.
@@ -41,6 +42,7 @@ The project overview is in `projects/index.html`. The initial detail pages are:
 - `projects/pokemon-tcg-binder/index.html`
 - `projects/PCF/index.html`
 - `projects/pokemon-nuzlocke/index.html`
+- `projects/tower-sentry-protocol/index.html`
 
 Each page contains comments beside the temporary title and copy that should be
 replaced. A project's homepage preview, overview card, detail page, and images all
