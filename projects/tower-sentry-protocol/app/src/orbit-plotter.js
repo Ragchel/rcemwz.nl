@@ -1007,18 +1007,19 @@ function initPlotter(){
       effInput.value = 100;
     }
 
-    // Hide the Assist module dropdown entirely if the system isn't unlocked.
-    $('assistModuleWrap').style.display = assistUnlocked ? '' : 'none';
+    // Once a save has loaded there's real data to pick from, so enable both
+    // dropdowns unconditionally — the assist slot may not be unlocked yet
+    // in this save, but the player may still want to preview a module in it.
     $('modulePrimarySelect').disabled = false;
-    $('moduleAssistSelect').disabled = !assistUnlocked;
+    $('moduleAssistSelect').disabled = false;
 
     // Land Mine Radius module bonus: summed from the save, not typed in.
     $('modMineRadius').value = fmt(sumArmorSubstatValue('Land Mine Radius'), 2);
 
-    const spaceDisplacerEquipped = isSpaceDisplacerEquipped();
-    const sdCheckbox = $('showSpaceDisplacer');
-    sdCheckbox.disabled = !spaceDisplacerEquipped;
-    sdCheckbox.checked = spaceDisplacerEquipped;
+    // Auto-fills from the save as a starting point, but never locks the
+    // control — the module might not be equipped yet in this save, but the
+    // player may still want to preview it.
+    $('showSpaceDisplacer').checked = isSpaceDisplacerEquipped();
 
     render();
   }
@@ -1371,7 +1372,7 @@ function initPlotter(){
       });
     }
     if ($('showWall').checked) landmarks.push({ name: 'Wall', rInternal: computeWallRadius(ar.capped), color: C.WALL_COLOR, isBrickWall: true });
-    if (!$('showSpaceDisplacer').disabled && $('showSpaceDisplacer').checked) {
+    if ($('showSpaceDisplacer').checked) {
       landmarks.push({
         name: 'Space Displacer mine orbit',
         // moduleTargetRadius=1.8 (the real scene-instance value, not the
