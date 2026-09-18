@@ -1002,10 +1002,9 @@ function initPlotter(){
 
     const effInput = $('assistArmorOrbsEff');
     if (!assistUnlocked || !hasOrbsSubstat(assistArmor)) {
-      effInput.value = 0; effInput.disabled = true;
-    } else {
-      effInput.disabled = false;
-      if (!effInput.value || effInput.value === '0') effInput.value = 100;
+      effInput.value = 0;
+    } else if (!effInput.value || effInput.value === '0') {
+      effInput.value = 100;
     }
 
     // Hide the Assist module dropdown entirely if the system isn't unlocked.
@@ -1228,7 +1227,7 @@ function initPlotter(){
     const level = Math.min(4, parseInt($('wsOrbLevel').value, 10) || 0);
     const perk = Math.min(2, Math.max(0, parseInt($('orbPerk').value, 10) || 0));
     const primaryArmor = $('primaryArmorOrbs').checked ? 2 : 0;
-    const assistEff = $('assistArmorOrbsEff').disabled ? 0 : (parseFloat($('assistArmorOrbsEff').value) || 0);
+    const assistEff = parseFloat($('assistArmorOrbsEff').value) || 0;
     const assistArmor = 2 * (assistEff / 100);
     const vault = $('vaultOrbNode').checked ? 1 : 0;
     return level + perk + primaryArmor + assistArmor + vault;
