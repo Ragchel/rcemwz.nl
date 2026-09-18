@@ -28,7 +28,7 @@ removes its content. Add the project preview images at:
 - `projects/pokemon-tcg-binder/images/preview.webp`
 - `projects/PCF/images/preview.svg`
 - `projects/pokemon-nuzlocke/images/preview.webp`
-- `projects/tower-sentry-protocol/images/preview.svg`
+- `projects/tower-sentry-protocol/images/preview.png`
 
 Other formats and filenames work too: update every matching `data-image` value.
 Update `data-alt` at the same time so the image is described clearly.
