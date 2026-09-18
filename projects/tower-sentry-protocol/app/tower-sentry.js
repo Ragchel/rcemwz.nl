@@ -1573,7 +1573,7 @@
       return d;
     }
 
-    grid.appendChild(block('', 'Attack range', fmt(m(ar.capped),1) + 'm <small>(' + fmt(ar.capped,2) + ' units)</small>'));
+    grid.appendChild(block('', 'Attack range', fmt(m(ar.capped),1) + 'm'));
     grid.appendChild(block('', 'Orbit bounds', fmt(m(computeOrbPlottedRadius(bounds.floor, ar.capped)),0) + '–' + fmt(m(computeOrbPlottedRadius(bounds.ceil, ar.capped)),0) + 'm'));
 
     grid.appendChild(block('brass', 'Workshop radius' + (wsAdjuster?'':' (locked)') + ' · ' + wsN + ' orbs', fmt(m(wsR),0) + 'm'));

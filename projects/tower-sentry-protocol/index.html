@@ -119,7 +119,7 @@
                                         <label for="midBattle">Mid-battle (use in-round Range buys instead of workshop level)</label>
                                     </div>
                                     <div class="field-row">
-                                        <label for="battleLevel">In-round Range buys<span class="hint">Main.upgradeLevel[4] — resets to 0 each battle</span></label>
+                                        <label for="battleLevel">In-round Range buys<span class="hint">Resets to 0 each battle</span></label>
                                         <input type="number" id="battleLevel" value="0" min="0" max="999">
                                     </div>
                                 </div>
@@ -216,11 +216,11 @@
                                     <label for="showMineRadius">Show Inner Land Mine orbit (real mine ring, not blast radius)</label>
                                 </div>
                                 <div class="field-row">
-                                    <label for="innerLandMineCount">Inner land mine count<span class="hint">Auto-filled from save (ultimateWeaponLevel[13], Main.GetInnerLandMineQuantity()'s formula) when loaded - editable, default is the formula's base of 3</span></label>
+                                    <label for="innerLandMineCount">Inner land mine count</label>
                                     <input type="number" id="innerLandMineCount" value="3" min="0" max="40" step="1">
                                 </div>
                                 <div class="field-row">
-                                    <label for="modMineCount">+ Inner Land Mine count from modules<span class="hint">Auto-filled from equipped Core modules' "Inner Land Mines - Quantity" substat (+1/+2/+3 at Legendary/Mythic/Ancestral) - editable</span></label>
+                                    <label for="modMineCount">+ Inner Land Mine count from modules</label>
                                     <input type="number" id="modMineCount" value="0" min="0" max="6" step="1">
                                 </div>
                                 <div class="checkline">
@@ -252,7 +252,7 @@
                                 </div>
                                 <div class="checkline">
                                     <input type="checkbox" id="rangedEnemyPerkActive">
-                                    <label for="rangedEnemyPerkActive">Ranged Enemy Perk active (Trade-Off #44: switches to the "near" radius, damage ×3)</label>
+                                    <label for="rangedEnemyPerkActive">Ranged Enemy Perk active</label>
                                 </div>
                             </div>
 
@@ -260,7 +260,7 @@
                     </div>
 
                     <p class="tsp-foot-note">
-                        The save loader runs entirely in your browser — the file never leaves this page. 1 internal unit = 10 displayed meters. Values still being pinned down against the game's own code are flagged as estimated rather than confirmed.
+                        The save loader runs entirely in your browser — the file never leaves this page.
                     </p>
 
                     <noscript>
