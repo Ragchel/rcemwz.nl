@@ -1002,24 +1002,24 @@ function initPlotter(){
 
     const effInput = $('assistArmorOrbsEff');
     if (!assistUnlocked || !hasOrbsSubstat(assistArmor)) {
-      effInput.value = 0; effInput.disabled = true;
-    } else {
-      effInput.disabled = false;
-      if (!effInput.value || effInput.value === '0') effInput.value = 100;
+      effInput.value = 0;
+    } else if (!effInput.value || effInput.value === '0') {
+      effInput.value = 100;
     }
 
-    // Hide the Assist module dropdown entirely if the system isn't unlocked.
-    $('assistModuleWrap').style.display = assistUnlocked ? '' : 'none';
+    // Once a save has loaded there's real data to pick from, so enable both
+    // dropdowns unconditionally — the assist slot may not be unlocked yet
+    // in this save, but the player may still want to preview a module in it.
     $('modulePrimarySelect').disabled = false;
-    $('moduleAssistSelect').disabled = !assistUnlocked;
+    $('moduleAssistSelect').disabled = false;
 
     // Land Mine Radius module bonus: summed from the save, not typed in.
     $('modMineRadius').value = fmt(sumArmorSubstatValue('Land Mine Radius'), 2);
 
-    const spaceDisplacerEquipped = isSpaceDisplacerEquipped();
-    const sdCheckbox = $('showSpaceDisplacer');
-    sdCheckbox.disabled = !spaceDisplacerEquipped;
-    sdCheckbox.checked = spaceDisplacerEquipped;
+    // Auto-fills from the save as a starting point, but never locks the
+    // control — the module might not be equipped yet in this save, but the
+    // player may still want to preview it.
+    $('showSpaceDisplacer').checked = isSpaceDisplacerEquipped();
 
     render();
   }
@@ -1228,7 +1228,7 @@ function initPlotter(){
     const level = Math.min(4, parseInt($('wsOrbLevel').value, 10) || 0);
     const perk = Math.min(2, Math.max(0, parseInt($('orbPerk').value, 10) || 0));
     const primaryArmor = $('primaryArmorOrbs').checked ? 2 : 0;
-    const assistEff = $('assistArmorOrbsEff').disabled ? 0 : (parseFloat($('assistArmorOrbsEff').value) || 0);
+    const assistEff = parseFloat($('assistArmorOrbsEff').value) || 0;
     const assistArmor = 2 * (assistEff / 100);
     const vault = $('vaultOrbNode').checked ? 1 : 0;
     return level + perk + primaryArmor + assistArmor + vault;
@@ -1372,7 +1372,7 @@ function initPlotter(){
       });
     }
     if ($('showWall').checked) landmarks.push({ name: 'Wall', rInternal: computeWallRadius(ar.capped), color: C.WALL_COLOR, isBrickWall: true });
-    if (!$('showSpaceDisplacer').disabled && $('showSpaceDisplacer').checked) {
+    if ($('showSpaceDisplacer').checked) {
       landmarks.push({
         name: 'Space Displacer mine orbit',
         // moduleTargetRadius=1.8 (the real scene-instance value, not the
