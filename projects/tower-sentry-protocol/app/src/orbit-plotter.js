@@ -1,4 +1,6 @@
-(function(){
+const { decodePlayerInfoSaveBytes } = require('./decode-save');
+
+function initPlotter(){
   const C = {
     LAB_BASE: 1.0, LAB_INCREASE: 0.02,
     UPG_BASE: 3.0, UPG_STEP: 0.05,
@@ -456,14 +458,6 @@
   // ============== save file loading ==============
   let saveRoot = null;
 
-  async function gunzip(bytes){
-    if (!(bytes[0] === 0x1f && bytes[1] === 0x8b)) return bytes; // not gzip, assume already raw
-    const ds = new DecompressionStream('gzip');
-    const stream = new Blob([bytes]).stream().pipeThrough(ds);
-    const buf = await new Response(stream).arrayBuffer();
-    return new Uint8Array(buf);
-  }
-
   function coerceNum(v){
     if (v == null) return null;
     if (typeof v === 'number') return v;
@@ -504,9 +498,8 @@
     statusEl.textContent = 'Reading ' + file.name + '…';
     try {
       const buf = new Uint8Array(await file.arrayBuffer());
-      const inflated = await gunzip(buf);
-      const decoded = window.NRBFReader.readStream(inflated);
-      saveRoot = window.nrbfToJSON(decoded);
+      const { parsedRoot } = decodePlayerInfoSaveBytes(buf);
+      saveRoot = parsedRoot;
       if (!saveRoot || typeof saveRoot !== 'object') throw new Error('Decoded root was empty');
       statusEl.className = 'load-status ok';
       statusEl.textContent = 'Loaded ' + file.name + '.';
@@ -1708,4 +1701,6 @@
   document.querySelectorAll('input:not(#fileInput)').forEach(inp => inp.addEventListener('input', render));
 
   render();
-})();
+}
+
+module.exports = { initPlotter };
