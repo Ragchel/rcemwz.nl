@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" role="img" aria-label="An original illustration inspired by the Sentry Protocol module's glowing neon icon: a ring above a stacked pair of wireframe pedestals around a diamond plate">
+    <title>Sentry Protocol</title>
+    <defs>
+        <linearGradient id="tspSky" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#170b28"/>
+            <stop offset="55%" stop-color="#241145"/>
+            <stop offset="100%" stop-color="#12081f"/>
+        </linearGradient>
+        <radialGradient id="tspFieldGlow" cx="50%" cy="52%" r="58%">
+            <stop offset="0%" stop-color="#b23fe0" stop-opacity="0.30"/>
+            <stop offset="100%" stop-color="#b23fe0" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="tspVignette" cx="50%" cy="46%" r="72%">
+            <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.5"/>
+        </radialGradient>
+        <filter id="tspGlowSoft" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="7"/>
+        </filter>
+        <filter id="tspGlowTight" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="2.6"/>
+        </filter>
+        <filter id="tspSofter" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="2.5"/>
+        </filter>
+    </defs>
+
+    <rect width="960" height="600" fill="url(#tspSky)"/>
+
+    <!-- light rays -->
+    <g opacity="0.35" stroke="#c464e8" stroke-width="10">
+        <line x1="960" y1="40" x2="560" y2="300" opacity="0.5"/>
+        <line x1="960" y1="120" x2="600" y2="320" opacity="0.35"/>
+        <line x1="960" y1="220" x2="640" y2="340" opacity="0.4"/>
+        <line x1="960" y1="340" x2="660" y2="360" opacity="0.3"/>
+        <line x1="960" y1="440" x2="640" y2="380" opacity="0.35"/>
+        <line x1="960" y1="540" x2="600" y2="400" opacity="0.3"/>
+    </g>
+
+    <g opacity="0.5">
+        <circle cx="120" cy="110" r="1.6" fill="#f4e9ff"/>
+        <circle cx="205" cy="65" r="1.1" fill="#f4e9ff"/>
+        <circle cx="75" cy="250" r="1.3" fill="#f4e9ff"/>
+        <circle cx="855" cy="95" r="1.4" fill="#f4e9ff"/>
+        <circle cx="150" cy="480" r="1.2" fill="#f4e9ff"/>
+    </g>
+
+    <circle cx="470" cy="330" r="260" fill="url(#tspFieldGlow)"/>
+
+    <!-- ==== icon, inspired by the Sentry Protocol module's own glyph ==== -->
+    <g transform="translate(470 300)">
+
+        <!-- base pedestal (wide) -->
+        <g filter="url(#tspGlowSoft)" opacity="0.9">
+            <path d="M 0 88 L 122 132 L 0 176 L -122 132 Z" fill="none" stroke="#ff3fd6" stroke-width="6"/>
+            <path d="M -122 132 L -122 160 L 0 206 L 122 160 L 122 132" fill="none" stroke="#ff3fd6" stroke-width="6"/>
+            <path d="M -122 160 L 0 176 L 122 160" fill="none" stroke="#ff3fd6" stroke-width="6"/>
+        </g>
+        <g>
+            <path d="M 0 88 L 122 132 L 0 176 L -122 132 Z" fill="none" stroke="#ffe0fa" stroke-width="1.6"/>
+            <path d="M -122 132 L -122 160 L 0 206 L 122 160 L 122 132" fill="none" stroke="#ffe0fa" stroke-width="1.6"/>
+            <path d="M -122 160 L 0 176 L 122 160" fill="none" stroke="#ffe0fa" stroke-width="1.6"/>
+        </g>
+        <g filter="url(#tspGlowTight)">
+            <circle cx="-122" cy="146" r="4.5" fill="#ffe14d"/>
+            <circle cx="122" cy="146" r="4.5" fill="#ffe14d"/>
+            <circle cx="0" cy="191" r="4.5" fill="#ffe14d"/>
+        </g>
+
+        <!-- diamond plate -->
+        <g filter="url(#tspGlowSoft)" opacity="0.9">
+            <path d="M 0 20 L 96 60 L 0 100 L -96 60 Z" fill="none" stroke="#ff3fd6" stroke-width="5.5"/>
+        </g>
+        <path d="M 0 20 L 96 60 L 0 100 L -96 60 Z" fill="none" stroke="#ffe0fa" stroke-width="1.4"/>
+        <g filter="url(#tspGlowTight)">
+            <path d="M 0 36 L 48 60 L 0 84 L -48 60 Z" fill="none" stroke="#ffe14d" stroke-width="3.5"/>
+        </g>
+        <path d="M 0 36 L 48 60 L 0 84 L -48 60 Z" fill="none" stroke="#fff8d9" stroke-width="1"/>
+
+        <!-- struts linking pedestal to small box -->
+        <g stroke="#ff3fd6" stroke-width="3" opacity="0.85">
+            <line x1="-96" y1="60" x2="-52" y2="0"/>
+            <line x1="96" y1="60" x2="52" y2="0"/>
+        </g>
+        <g stroke="#ffe14d" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round" opacity="0.9">
+            <line x1="-52" y1="0" x2="-38" y2="-30"/>
+            <line x1="52" y1="0" x2="38" y2="-30"/>
+        </g>
+
+        <!-- small box -->
+        <g filter="url(#tspGlowSoft)" opacity="0.9">
+            <path d="M 0 -68 L 52 -46 L 0 -24 L -52 -46 Z" fill="none" stroke="#ff3fd6" stroke-width="5"/>
+            <path d="M -52 -46 L -52 -18 L 0 4 L 52 -18 L 52 -46" fill="none" stroke="#ff3fd6" stroke-width="5"/>
+            <path d="M -52 -18 L 0 -24 L 52 -18" fill="none" stroke="#ff3fd6" stroke-width="5"/>
+        </g>
+        <g>
+            <path d="M 0 -68 L 52 -46 L 0 -24 L -52 -46 Z" fill="none" stroke="#ffe0fa" stroke-width="1.3"/>
+            <path d="M -52 -46 L -52 -18 L 0 4 L 52 -18 L 52 -46" fill="none" stroke="#ffe0fa" stroke-width="1.3"/>
+            <path d="M -52 -18 L 0 -24 L 52 -18" fill="none" stroke="#ffe0fa" stroke-width="1.3"/>
+        </g>
+        <g filter="url(#tspGlowTight)">
+            <circle cx="-52" cy="-32" r="3.4" fill="#ffe14d"/>
+            <circle cx="52" cy="-32" r="3.4" fill="#ffe14d"/>
+        </g>
+
+        <!-- ring -->
+        <g filter="url(#tspGlowSoft)">
+            <circle cx="0" cy="-112" r="30" fill="none" stroke="#ffe14d" stroke-width="7"/>
+        </g>
+        <circle cx="0" cy="-112" r="30" fill="none" stroke="#fff8d9" stroke-width="1.6"/>
+    </g>
+
+    <g opacity="0.42" filter="url(#tspSofter)" fill="#ffb9cc">
+        <path d="M84 522 c10 -14 30 -14 40 0 c-10 10 -30 10 -40 0 Z"/>
+        <path d="M84 522 c-4 -16 10 -30 26 -28 c-2 14 -12 26 -26 28 Z"/>
+        <path d="M84 522 c-14 6 -30 -2 -32 -18 c14 -4 28 6 32 18 Z"/>
+        <path d="M84 522 c16 4 24 20 16 34 c-12 -6 -20 -20 -16 -34 Z"/>
+        <path d="M84 522 c14 -8 30 0 32 16 c-14 4 -28 -4 -32 -16 Z"/>
+    </g>
+
+    <rect width="960" height="600" fill="url(#tspVignette)"/>
+</svg>
