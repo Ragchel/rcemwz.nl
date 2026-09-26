@@ -25,10 +25,10 @@ expects the about image at:
 Each project's page and images are kept together so removing its directory also
 removes its content. Add the project preview images at:
 
-- `projects/pokemon-tcg-binder/images/preview.webp`
-- `projects/PCF/images/preview.svg`
-- `projects/pokemon-nuzlocke/images/preview.webp`
-- `projects/tower-sentry-protocol/images/preview.svg`
+- `pokemon/binder/images/preview.webp`
+- `tower/PCF/images/preview.svg`
+- `pokemon/nuzlocke/images/preview.webp`
+- `tower/sentry-protocol/images/preview.svg`
 
 Other formats and filenames work too: update every matching `data-image` value.
 Update `data-alt` at the same time so the image is described clearly.
@@ -37,12 +37,13 @@ slots, while a portrait or square image suits the about section.
 
 ## Edit projects
 
-The project overview is in `projects/index.html`. The initial detail pages are:
+The project overview is in `projects/index.html`, served at `/projects/`.
+The detail pages are:
 
-- `projects/pokemon-tcg-binder/index.html`
-- `projects/PCF/index.html`
-- `projects/pokemon-nuzlocke/index.html`
-- `projects/tower-sentry-protocol/index.html`
+- `pokemon/binder/index.html`
+- `tower/PCF/index.html`
+- `pokemon/nuzlocke/index.html`
+- `tower/sentry-protocol/index.html`
 
 Each page contains comments beside the temporary title and copy that should be
 replaced. A project's homepage preview, overview card, detail page, and images all
@@ -51,6 +52,9 @@ live in or reference that project's own folder.
 ### Update the Pokémon binder
 
 The Pokémon TCG binder is an interactive 1,088-pocket collection. Add WebP card
-images to `projects/pokemon-tcg-binder/images/cards/` using the pocket number as the filename:
+images to `pokemon/binder/images/cards/` using the pocket number as the filename:
 `card-1.webp`, `card-2.webp`, `card-3.webp`, and so on. No HTML or JavaScript edit
-is needed. See `projects/pokemon-tcg-binder/images/README.md` for the pocket order.
+is needed. See `pokemon/binder/images/README.md` for the pocket order.
+
+Projects are grouped under `/pokemon/` and `/tower/`. The `/projects/` folder
+contains only the project overview.
