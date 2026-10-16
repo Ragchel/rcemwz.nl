@@ -1,4 +1,4 @@
-const { decodePlayerInfoSaveBytes } = require('./decode-save');
+const { decodeSaveFile } = require('thetowersdk/save-decoder');
 const { extractSaveData } = require('./extract-save-data');
 const {
     computeEffectiveChronoField,
@@ -864,8 +864,7 @@ function initCalculator(root) {
         workspace.hidden = true;
 
         try {
-            const bytes = new Uint8Array(await file.arrayBuffer());
-            const { parsedRoot } = decodePlayerInfoSaveBytes(bytes);
+            const parsedRoot = await decodeSaveFile(await file.arrayBuffer());
             const data = extractSaveData(parsedRoot);
 
             renderWorkspace(workspace, data);

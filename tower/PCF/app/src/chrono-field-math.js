@@ -4,12 +4,10 @@ const {
     assistEfficiency: computeAssistEfficiencyFraction,
     cumulativeAssistEfficiencyStoneCost,
     maxStoneLevel: assistEfficiencyMaxStoneLevel,
-} = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
-const {
     labCoinCostToReachLevel,
     labDurationDaysToReachLevel,
     labMaxCatalogLevel,
-} = require('thetowersdk/internal/mechanics/effective-paths-lab-costs');
+} = require('./sdk');
 
 // Only the "substat" efficiency track matters here — Chrono Field's
 // contributions are all substats, never the "multiplier" track.
