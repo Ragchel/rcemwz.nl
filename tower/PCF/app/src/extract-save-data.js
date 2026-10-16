@@ -2,19 +2,18 @@ const {
     readModulesFromSaveRoot,
     MODULE_SAVE_ASSIST_TYPE_TO_CATEGORY,
     MODULE_SAVE_ASSIST_SLOTS_KEY,
-} = require('thetowersdk/internal/save/modules');
-const { decodeModuleSubstats } = require('thetowersdk/internal/save/module-effects-decode');
-const { assistEfficiency } = require('thetowersdk/internal/mechanics/effective-paths-assist-efficiency');
-const { computeCoinsPerHourFromSaveRoot } = require('thetowersdk/internal/save/battle-history');
-// Deep imports instead of `thetowersdk/internal/save/relics` — that module
-// also drops in `save/workshop.js` for two generic array-coercion helpers,
-// which drags along the ~3MB workshop catalog for nothing this app uses.
-// This combination only pulls in the (much smaller) relic import catalog.
-const { buildRelicTemplateIdLookup, findRelicTemplateIdFromSaveIndex } = require('thetowersdk/internal/save/catalogs/relic-template-match');
-const { RELIC_TEMPLATES, computeLabSpeedRelicBonusPercent } = require('thetowersdk/internal/data/relics');
+    decodeModuleSubstats,
+    assistEfficiency,
+    computeCoinsPerHourFromSaveRoot,
+    buildRelicTemplateIdLookup,
+    findRelicTemplateIdFromSaveIndex,
+    RELIC_TEMPLATES,
+    computeLabSpeedRelicBonusPercent,
+} = require('./sdk');
 const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 
-// Stable save-array positions from thetowersdk@0.5.3. Reading these two lab
+// Stable save-array positions from thetowersdk@0.5.3 (re-checked
+// against 0.12.0's `LAB_RESEARCH_BY_INDEX`). Reading these two lab
 // levels directly avoids bundling the SDK's complete lab catalog.
 const CHRONO_FIELD_DURATION_LAB_INDEX = 53;
 const CHRONO_FIELD_DURATION_LAB_MAX = 30;
