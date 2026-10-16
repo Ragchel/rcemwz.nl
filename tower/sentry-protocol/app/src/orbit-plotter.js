@@ -1,4 +1,4 @@
-const { decodePlayerInfoSaveBytes } = require('./decode-save');
+const { decodeSaveFile } = require('thetowersdk/save-decoder');
 
 function initPlotter(){
   const C = {
@@ -497,9 +497,7 @@ function initPlotter(){
     statusEl.className = 'load-status';
     statusEl.textContent = 'Reading ' + file.name + '…';
     try {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      const { parsedRoot } = decodePlayerInfoSaveBytes(buf);
-      saveRoot = parsedRoot;
+      saveRoot = await decodeSaveFile(await file.arrayBuffer());
       if (!saveRoot || typeof saveRoot !== 'object') throw new Error('Decoded root was empty');
       statusEl.className = 'load-status ok';
       statusEl.textContent = 'Loaded ' + file.name + '.';
