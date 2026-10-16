@@ -1,6 +1,7 @@
 /**
  * Chrono Field per-level value/stone-cost table, vendored from
- * thetowersdk@0.5.3's `uwStoneChartData.chrono_field` (dist/data/ultimate-weapon-stones.js).
+ * thetowersdk's `uwStoneChartData.chrono_field` (first copied from 0.5.3; re-checked
+ * identical against 0.12.0's `thetowersdk/data`).
  *
  * Copied locally instead of importing `thetowersdk/data` because that barrel
  * pulls in ~5MB of unrelated game data (workshop, glossary, player stats, ...)
