@@ -11,3 +11,18 @@ its archive card. Keep detailed rules in the separate ruleset field. Pokémon
 Black run 1 is Nuzlocke only.
 
 Use a unique folder and page for every attempt. For example, a second Pokémon Emerald attempt should live separately from the first (`emerald-run-1` and `emerald-run-2`), even though both use the same game.
+
+## Pokémon Black run 1 session style
+
+Session 1 is the default style for every session on `black-run-1/index.html`.
+Use an eyebrow in the format `Session N · D Month YYYY · HH:MM–HH:MM TZ`,
+followed by a descriptive level-two heading and a `journey-log` containing
+`journey-entry` articles. Each entry has a `journey-heading` with its location
+or context, a level-three title, and first-person story text. When a Pokémon
+image is available, reuse the `journey-entry--with-pokemon`, `journey-pokemon`,
+and `journey-copy` layout from session 1.
+
+Treat supplied session durations as exact. Calculate the end time from the
+start time and duration, and keep total playtime on the run page and archive
+in sync. Leave unknown dates, times, and encounter details clearly marked
+until Rachel supplies them.

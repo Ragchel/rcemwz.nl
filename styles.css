@@ -762,6 +762,7 @@ code {
 .encounter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 2rem; }
 .encounter-card { display: grid; padding: 1rem; grid-template-columns: 6rem 1fr; align-items: center; gap: 1.25rem; background: rgba(255,255,255,.55); border: 1px solid var(--line); border-radius: 1.25rem; }
 .pokemon-portrait { display: grid; width: 6rem; aspect-ratio: 1; margin: 0; place-items: center; overflow: hidden; color: var(--pink-dark); background: var(--paper-deep); border-radius: 50%; font-family: var(--serif); font-size: 2rem; }
+.pokemon-portrait object { max-width: 100%; height: 100%; object-fit: contain; font-family: inherit; font-size: .875rem; }
 .pokemon-portrait img { width: 100%; height: 100%; padding: .4rem; object-fit: contain; }
 .journey-entry--with-pokemon { display: grid; grid-template-columns: clamp(3.5rem, 16vw, 7.5rem) minmax(0, 1fr); align-items: start; gap: clamp(.75rem, 2vw, 1.5rem); }
 .journey-heading { grid-column: 1 / -1; }

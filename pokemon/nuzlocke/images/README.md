@@ -14,3 +14,10 @@ Locally stored Pokémon artwork from the PokéAPI sprites repository:
 
 Pokémon artwork belongs to its respective rights holders. These images are reused
 in the journey notes and team section; visitors do not need to load third-party images.
+
+### Pending Black run 1 artwork
+
+Add `black-run-1/purrloin.png` for Xena and `black-run-1/panpour.png` for Kai.
+The journey and team image slots already reference these filenames and show
+the species name until the files are available. Use square, optimized PNGs;
+no page edits are needed after adding them.
