@@ -39,6 +39,8 @@ The project showcase is the heart of the site. A useful project entry may includ
 
 Write in a first-person, conversational voice. Be honest about unfinished experiments and small projects; they do not need to be presented as products. Do not invent biography, project facts, testimonials, metrics, dates, links, or contact details. Use clearly marked placeholder content when information has not been provided.
 
+Never use em dashes anywhere on this website, including page titles, metadata, navigation, and body copy. Use commas, periods, colons, semicolons, or parentheses as appropriate. This also applies to HTML entities that render as em dashes.
+
 Protect privacy. Before exposing repository URLs, email addresses, analytics, personal metadata, or details about private projects, confirm that the information is already intentionally public or was explicitly supplied for publication. Never commit secrets or credentials.
 
 ### Project 3: Nuzlocke journal
