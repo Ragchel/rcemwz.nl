@@ -6,7 +6,7 @@
     "build": "esbuild src/main.js --bundle --minify --outfile=dist/tower-sentry.js"
   },
   "dependencies": {
-    "thetowersdk": "^0.12.0"
+    "thetowersdk": "^0.13.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

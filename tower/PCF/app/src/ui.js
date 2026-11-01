@@ -860,7 +860,7 @@ function initCalculator(root) {
         const file = fileInput.files?.[0];
         if (!file) return;
 
-        setStatus(statusEl, 'Reading save file…');
+        setStatus(statusEl, 'Reading export file…');
         workspace.hidden = true;
 
         try {
@@ -878,7 +878,7 @@ function initCalculator(root) {
                 data.warnings.length > 0,
             );
         } catch (error) {
-            setStatus(statusEl, `Could not read that save file (${error.message}).`, true);
+            setStatus(statusEl, `Could not read that file (${error.message}).`, true);
         }
     });
 }
