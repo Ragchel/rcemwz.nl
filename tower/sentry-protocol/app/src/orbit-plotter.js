@@ -445,9 +445,14 @@ function initPlotter(){
   const WORKSHOP_ORB_ADJUSTER_VAULT_ID = 2020;
 
   function vaultUpgradeLevel(vaultId){
-    const dict = saveRoot && saveRoot.vault && saveRoot.vault['<UpgradesLevel>k__BackingField'];
-    const pairs = dict && Array.isArray(dict.KeyValuePairs) ? dict.KeyValuePairs : [];
-    const hit = pairs.find(p => p && p.key && coerceNum(p.key.value__) === vaultId);
+    // Same shapes as the SDK's readVaultV29ProgressFromSaveRoot: the export's
+    // field naming differs from the old binary save's backing field.
+    const vault = saveRoot && saveRoot.vault;
+    const dict = vault && (vault.upgradesLevel || vault.UpgradesLevel || vault['<UpgradesLevel>k__BackingField']);
+    if (!dict || typeof dict !== 'object') return 0;
+    const pairs = dict.keyValuePairs || dict.KeyValuePairs;
+    if (!Array.isArray(pairs)) return coerceNum(dict[vaultId]) || 0;
+    const hit = pairs.find(p => p && coerceNum(p.key) === vaultId);
     return hit ? (coerceNum(hit.value) || 0) : 0;
   }
 
@@ -484,13 +489,21 @@ function initPlotter(){
   }
 
   // A save's preset-level matrix (e.g. presetUpgradeWorkshopLevel) can arrive
-  // already nested (array of per-preset arrays) or, for a save with only one
-  // populated preset, as one flat array — handle both.
-  function asMatrix(raw, columns){
+  // already nested (array of per-preset arrays) or as one flat array, which
+  // tool_export.json uses: every preset's row back to back, so it's split
+  // evenly by preset count. A flat array that doesn't divide evenly is treated
+  // as a single preset's row.
+  function asMatrix(raw, presetCount){
     if (!Array.isArray(raw) || raw.length === 0) return [];
     if (Array.isArray(raw[0])) return raw.map(row => toNumArr(row));
-    return [toNumArr(raw)];
+    const values = toNumArr(raw);
+    if (presetCount > 1 && values.length % presetCount === 0) {
+      const columns = values.length / presetCount;
+      return Array.from({ length: presetCount }, (_, p) => values.slice(p * columns, (p + 1) * columns));
+    }
+    return [values];
   }
+  function presetCount(names){ return Array.isArray(names) ? names.length : 0; }
 
   async function handleFileLoad(file){
     const statusEl = $('loadStatus');
@@ -504,7 +517,7 @@ function initPlotter(){
       populatePresetsFromSave();
     } catch (err) {
       statusEl.className = 'load-status err';
-      statusEl.textContent = 'Could not read save: ' + err.message;
+      statusEl.textContent = 'Could not read file: ' + err.message;
     }
   }
 
@@ -514,33 +527,114 @@ function initPlotter(){
   });
 
   function populatePresetsFromSave(){
-    const wsNames = toStrArr(saveRoot.workshopPresetName);
-    const cardNames = toStrArr(saveRoot.presetName);
-    const names = wsNames.length ? wsNames : cardNames;
+    fillPresetSelect($('workshopPresetSelect'), saveRoot.workshopPresetName, 'Workshop preset', saveRoot.currentWorkshopPreset);
+    fillPresetSelect($('cardPresetSelect'), saveRoot.presetName, 'Card preset', saveRoot.currentPreset);
+    fillPresetSelect($('modulePresetSelect'), unwrapList(saveRoot.modulePresets).map(p => p && p.presetName), 'Module preset', saveRoot.currentModulePreset);
+
+    globalPresetChoices = listGlobalPresets();
     const sel = $('presetSelect');
     sel.innerHTML = '';
-    if (names.length === 0){
-      sel.innerHTML = '<option>No presets found in save</option>';
+    if (globalPresetChoices.length === 0){
+      sel.innerHTML = '<option>No global presets in this save</option>';
       sel.disabled = true;
+      applyPresets();
       return;
     }
-    names.forEach((n, i) => {
+    globalPresetChoices.forEach(choice => {
       const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = n || ('Preset ' + i);
+      opt.value = choice.index;
+      opt.textContent = choice.name;
       sel.appendChild(opt);
     });
     sel.disabled = false;
-    const current = coerceNum(saveRoot.currentWorkshopPreset) ?? 0;
-    sel.value = Math.min(names.length - 1, Math.max(0, current));
-    applyPresetIndex(parseInt(sel.value, 10));
+    const current = coerceNum(saveRoot.currentGlobalPreset) ?? 0;
+    const initial = globalPresetChoices.find(choice => choice.index === current) || globalPresetChoices[0];
+    sel.value = initial.index;
+    applyGlobalPreset(initial.index);
+  }
+
+  function fillPresetSelect(sel, names, fallbackLabel, current){
+    const list = Array.isArray(names) ? names : [];
+    sel.innerHTML = '';
+    if (list.length === 0){
+      sel.innerHTML = '<option>None in this save</option>';
+      sel.disabled = true;
+      return;
+    }
+    list.forEach((name, index) => {
+      const opt = document.createElement('option');
+      opt.value = index;
+      opt.textContent = String(name ?? '').trim() || (fallbackLabel + ' ' + (index + 1));
+      sel.appendChild(opt);
+    });
+    sel.disabled = false;
+    setPresetSelect(sel, coerceNum(current) ?? 0);
+  }
+
+  function setPresetSelect(sel, index){
+    if (!sel.disabled && index >= 0 && index < sel.options.length) sel.value = index;
+  }
+
+  function presetSelectIndex(id){
+    const index = parseInt($(id).value, 10);
+    return Number.isNaN(index) ? 0 : index;
+  }
+
+  // A global preset sets the three pickers below it; changing one of those by
+  // hand overrides just that part. Bots and guardians are left out because
+  // nothing plotted here depends on them.
+  const GLOBAL_PRESET_FIELDS = [
+    ['workshopPresetSelect', 'workshopIndex'],
+    ['cardPresetSelect', 'cardsIndex'],
+    ['modulePresetSelect', 'modulesIndex'],
+  ];
+  const CUSTOM_PRESET_VALUE = 'custom';
+
+  function applyGlobalPreset(index){
+    const entry = unwrapList(saveRoot.globalPresets)[index];
+    GLOBAL_PRESET_FIELDS.forEach(([id, field]) => {
+      const value = entry ? coerceNum(entry[field]) : null;
+      if (value != null) setPresetSelect($(id), value);
+    });
+    syncGlobalPresetSelect();
+    applyPresets();
+  }
+
+  // Shows the global preset the pickers currently add up to, or a temporary
+  // "Custom" entry if they don't match one, so choosing a real global preset
+  // afterwards always registers as a change and undoes the overrides.
+  function syncGlobalPresetSelect(){
+    const sel = $('presetSelect');
+    if (sel.disabled) return;
+    const custom = sel.querySelector('option[value="' + CUSTOM_PRESET_VALUE + '"]');
+    if (custom) custom.remove();
+    const globals = unwrapList(saveRoot.globalPresets);
+    const match = globalPresetChoices.find(choice =>
+      GLOBAL_PRESET_FIELDS.every(([id, field]) => $(id).disabled || coerceNum(globals[choice.index] && globals[choice.index][field]) === presetSelectIndex(id)));
+    if (match) {
+      sel.value = match.index;
+      return;
+    }
+    const opt = document.createElement('option');
+    opt.value = CUSTOM_PRESET_VALUE;
+    opt.textContent = 'Custom';
+    sel.appendChild(opt);
+    sel.value = CUSTOM_PRESET_VALUE;
   }
 
   $('presetSelect').addEventListener('change', () => {
-    if (saveRoot) applyPresetIndex(parseInt($('presetSelect').value, 10));
+    const index = parseInt($('presetSelect').value, 10);
+    if (saveRoot && !Number.isNaN(index)) applyGlobalPreset(index);
+  });
+  GLOBAL_PRESET_FIELDS.forEach(([id]) => {
+    $(id).addEventListener('change', () => {
+      if (!saveRoot) return;
+      syncGlobalPresetSelect();
+      applyPresets();
+    });
   });
 
-  function applyPresetIndex(i){
+  function applyPresets(){
     if (!saveRoot) return;
 
     // Lab level is global (not per-preset).
@@ -568,10 +662,12 @@ function initPlotter(){
     }
 
     // Workshop levels are per-preset matrices, one row per preset.
-    const attackMatrix = asMatrix(saveRoot.presetUpgradeWorkshopLevel, WS_ATTACK_ORDER.length);
-    const defenseMatrix = asMatrix(saveRoot.presetUpgradeWorkshopDefenseLevel, WS_DEFENSE_ORDER.length);
-    const attackRow = attackMatrix[i] || attackMatrix[0] || [];
-    const defenseRow = defenseMatrix[i] || defenseMatrix[0] || [];
+    const workshopPresets = presetCount(saveRoot.workshopPresetName);
+    const attackMatrix = asMatrix(saveRoot.presetUpgradeWorkshopLevel, workshopPresets);
+    const defenseMatrix = asMatrix(saveRoot.presetUpgradeWorkshopDefenseLevel, workshopPresets);
+    const workshopIndex = presetSelectIndex('workshopPresetSelect');
+    const attackRow = attackMatrix[workshopIndex] || attackMatrix[0] || [];
+    const defenseRow = defenseMatrix[workshopIndex] || defenseMatrix[0] || [];
     if (attackRow[WS_RANGE_IDX] != null) $('wsLevel').value = attackRow[WS_RANGE_IDX];
     if (defenseRow[WS_ORBS_IDX] != null) $('wsOrbLevel').value = Math.min(4, defenseRow[WS_ORBS_IDX]);
     if (defenseRow[WS_MINE_RADIUS_IDX] != null) mineWorkshopLevel = defenseRow[WS_MINE_RADIUS_IDX];
@@ -580,14 +676,14 @@ function initPlotter(){
     const cardLevel = toNumArr(saveRoot.cardLevel);
     if (cardLevel[CARD_RANGE_ID] != null) $('cardLevel').value = cardLevel[CARD_RANGE_ID];
 
-    const slotCard = saveRoot.slotPresetCardInt;
-    const slotAssigned = saveRoot.slotPresetCardAssignedBool;
+    const cardPresets = presetCount(saveRoot.presetName);
+    const cardIndex = presetSelectIndex('cardPresetSelect');
+    const row = asMatrix(saveRoot.slotPresetCardInt, cardPresets)[cardIndex];
+    const assignedRow = asMatrix(saveRoot.slotPresetCardAssignedBool, cardPresets)[cardIndex] || null;
     let rangeActive = false;
-    if (Array.isArray(slotCard) && Array.isArray(slotCard[i])) {
-      const row = slotCard[i];
-      const assignedRow = Array.isArray(slotAssigned) && Array.isArray(slotAssigned[i]) ? slotAssigned[i] : null;
+    if (row) {
       row.forEach((cardIdx, slot) => {
-        if (coerceNum(cardIdx) === CARD_RANGE_ID && (!assignedRow || assignedRow[slot])) rangeActive = true;
+        if (cardIdx === CARD_RANGE_ID && (!assignedRow || assignedRow[slot])) rangeActive = true;
       });
     }
     $('cardActive').checked = rangeActive;
@@ -610,7 +706,7 @@ function initPlotter(){
       }
     }
 
-    refreshArmorModules(i);
+    refreshArmorModules(presetSelectIndex('modulePresetSelect'));
     applyVaultAndArmorDetection(); // also calls render()
   }
 
@@ -709,20 +805,21 @@ function initPlotter(){
     unwrapList(saveRoot.assistModuleSlots).forEach(slot => { if (slot) addItem(slot.equippedModule); });
   }
 
-  // A save's globalPresets (List<GlobalPresetData>) ties workshop/cards/bots/
-  // modules/guardians preset indices together per named preset. The preset
-  // selector above indexes into the workshop preset list directly, so match
-  // by name to find the corresponding modulesIndex; fall back to the same
-  // raw index if globalPresets is absent or has no matching name.
-  function findGlobalPresetForIndex(i){
-    const wsNames = toStrArr(saveRoot.workshopPresetName);
-    const name = wsNames[i];
-    const globalList = unwrapList(saveRoot.globalPresets);
-    if (name) {
-      const match = globalList.find(g => g && g.presetName === name);
-      if (match) return match;
-    }
-    return globalList[i] || null;
+  // A save's globalPresets (List<GlobalPresetData>) is the list of presets a
+  // player actually switches between: each entry ties together workshop/cards/
+  // bots/modules/guardians preset indices. Those indices are the only link -
+  // a global preset sharing a name with a workshop or card preset means
+  // nothing. The list always has spare slots still called "Preset N", and the
+  // export doesn't say how many are in use, so renamed entries are taken as
+  // the real ones (all of them if none were renamed).
+  const DEFAULT_GLOBAL_PRESET_NAME = /^Preset \d+$/;
+  let globalPresetChoices = [];
+
+  function listGlobalPresets(){
+    const globals = unwrapList(saveRoot.globalPresets)
+      .map((g, index) => ({ index, name: String((g && g.presetName) ?? '').trim() || ('Preset ' + (index + 1)) }));
+    const renamed = globals.filter(g => !DEFAULT_GLOBAL_PRESET_NAME.test(g.name));
+    return renamed.length ? renamed : globals;
   }
 
   // Every Armor module the player owns, for the dropdown lists — not just
@@ -743,14 +840,12 @@ function initPlotter(){
   // back to the currently-equipped slot if the GUID isn't found in inventory
   // or modulePresets is absent from this save. Assist slots nest their
   // ModuleItem under equippedModule, not on the slot object itself.
-  function resolveEquippedArmor(i){
+  function resolveEquippedArmor(modulesIndex){
     const result = { Primary: null, Assist: null };
     if (!saveRoot) return result;
 
     const modulePresetsList = unwrapList(saveRoot.modulePresets);
-    const globalEntry = findGlobalPresetForIndex(i);
-    const modulesIndex = globalEntry ? coerceNum(globalEntry.modulesIndex) : null;
-    const preset = modulePresetsList[modulesIndex != null ? modulesIndex : i] || null;
+    const preset = modulePresetsList[modulesIndex] || null;
 
     if (preset) {
       const pGuid = Array.isArray(preset.primaryModuleGuids) ? preset.primaryModuleGuids[ARMOR_CATEGORY_IDX] : null;
@@ -780,14 +875,12 @@ function initPlotter(){
   // equipped Primary/Assist Core modules to sum their "Inner Land Mines -
   // Quantity" substat, the module term of Main.GetInnerLandMineQuantity()'s
   // formula (see SUBSTAT_DETAILS ids 274/275/276 above).
-  function resolveEquippedCore(i){
+  function resolveEquippedCore(modulesIndex){
     const result = { Primary: null, Assist: null };
     if (!saveRoot) return result;
 
     const modulePresetsList = unwrapList(saveRoot.modulePresets);
-    const globalEntry = findGlobalPresetForIndex(i);
-    const modulesIndex = globalEntry ? coerceNum(globalEntry.modulesIndex) : null;
-    const preset = modulePresetsList[modulesIndex != null ? modulesIndex : i] || null;
+    const preset = modulePresetsList[modulesIndex] || null;
 
     if (preset) {
       const pGuid = Array.isArray(preset.primaryModuleGuids) ? preset.primaryModuleGuids[CORE_CATEGORY_IDX] : null;
@@ -881,10 +974,10 @@ function initPlotter(){
       : '<option value="">No owned Armor modules found</option>';
   }
 
-  function refreshArmorModules(i){
+  function refreshArmorModules(modulesIndex){
     buildInventoryIndex();
     sentryProtocolInPlay = isSentryProtocolEquippedAnywhere();
-    const equipped = resolveEquippedArmor(i);
+    const equipped = resolveEquippedArmor(modulesIndex);
     const baseOptions = buildArmorInventoryOptions();
     primaryArmorOptions = optionsWithFallback(baseOptions, equipped.Primary);
     assistArmorOptions = optionsWithFallback(baseOptions, equipped.Assist);
@@ -895,7 +988,7 @@ function initPlotter(){
     if (equipped.Assist) $('moduleAssistSelect').value = equipped.Assist.guid || '';
 
     currentArmor = equipped;
-    currentCore = resolveEquippedCore(i);
+    currentCore = resolveEquippedCore(modulesIndex);
     $('modMineCount').value = sumCoreSubstatValue('Inner Land Mines - Quantity');
     renderModuleDetail('Primary');
     renderModuleDetail('Assist');

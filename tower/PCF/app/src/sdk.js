@@ -8,7 +8,7 @@
 // `exports` map via a relative path. That is NOT a supported surface: when
 // upgrading the SDK, check that each file below still exists and still
 // exports these names (`npm test` and `npm run build` will both fail loudly
-// if one moved). Paths verified against thetowersdk@0.12.0.
+// if one moved). Paths verified against thetowersdk@0.13.0.
 const {
     readModulesFromSaveRoot,
     MODULE_SAVE_ASSIST_TYPE_TO_CATEGORY,

@@ -7,7 +7,7 @@
     "test": "node test/calculator.test.js"
   },
   "dependencies": {
-    "thetowersdk": "^0.12.0"
+    "thetowersdk": "^0.13.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
