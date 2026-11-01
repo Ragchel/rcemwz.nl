@@ -13,7 +13,7 @@ const {
 const { CHRONO_FIELD_SUBSTAT_KEYS } = require('./constants');
 
 // Stable save-array positions from thetowersdk@0.5.3 (re-checked
-// against 0.12.0's `LAB_RESEARCH_BY_INDEX`). Reading these two lab
+// against 0.13.0's `LAB_RESEARCH_BY_INDEX`). Reading these two lab
 // levels directly avoids bundling the SDK's complete lab catalog.
 const CHRONO_FIELD_DURATION_LAB_INDEX = 53;
 const CHRONO_FIELD_DURATION_LAB_MAX = 30;
